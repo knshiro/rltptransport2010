@@ -56,6 +56,7 @@ int rltp_connect(struct rltp_client_pcb *cpcb, char *dst_addr, int dst_port){
         printf("Packet of type %d received\n", pkbuffer->hdr.type );
         if ( pkbuffer->hdr.type == RLTP_TYPE_ACK ) {
           printf("Connection successful\n");
+          cpcb->state = RLTP_STATE_ESTABLISHED;
           break;
         } else {
           i++;
