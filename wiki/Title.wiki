@@ -8,4 +8,6 @@ Voici notre wiki, feel free to complete.
 
 = Details =
 
-Blablabla Rltp tout ca tout ca...
+Les regles pour le svn :
+  * Ne pas commiter du code qui ne compile pas, (si possible qui ne fasse pas de seg fault non plus...)
+  * Updater toujours avant de commiter, le mieux : updater avant de commencer a travailler et ensuite juste avant de commiter.
