@@ -1,0 +1,11 @@
+#summary One-sentence summary of this page.
+#labels Featured
+
+= Introduction =
+
+Voici notre wiki, feel free to complete.
+
+
+= Details =
+
+Blablabla Rltp tout ca tout ca...
