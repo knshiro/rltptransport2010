@@ -1,5 +1,5 @@
 /*
- * File Name:        rltp.h
+ * File Name:        rtlp.h
  *
  * Last Modified:    07/03/2010
  *
@@ -12,11 +12,11 @@
  *			
  * This head file provides the basic function definitions and 
  * definitions for the implementaion of the Reliable Transport 
- * Layer Protocol (RLTP)
+ * Layer Protocol (RTLP)
  */
 
-#ifndef RLTP_H
-#define RLTP_H
+#ifndef RTLP_H
+#define RTLP_H
 
 #include <sys/socket.h>
 #include <sys/types.h>
@@ -24,34 +24,34 @@
 #include <netdb.h>
 
 
-/*************************** RLTP Packet Types
+/*************************** RTLP Packet Types
 ****************************/
-#define RLTP_TYPE_DATA 1 /* Data packet */
-#define RLTP_TYPE_ACK  2 /* Acknowledgement packet*/
-#define RLTP_TYPE_SYN  3 /* SYN packet, initiates connection setup*/
-#define RLTP_TYPE_FIN  4 /* FIN packet, initiates closing of connection */
-#define RLTP_TYPE_RST  5 /* Reset packet, resets connection */
+#define RTLP_TYPE_DATA 1 /* Data packet */
+#define RTLP_TYPE_ACK  2 /* Acknowledgement packet*/
+#define RTLP_TYPE_SYN  3 /* SYN packet, initiates connection setup*/
+#define RTLP_TYPE_FIN  4 /* FIN packet, initiates closing of connection */
+#define RTLP_TYPE_RST  5 /* Reset packet, resets connection */
 
 
-/*************************** RLTP Protocol State ****************************/
+/*************************** RTLP Protocol State ****************************/
 /* Max payload */
-#define RLTP_MAX_PAYLOAD_SIZE		1024
-#define RLTP_MAX_SEND_BUF_SIZE		4
+#define RTLP_MAX_PAYLOAD_SIZE		1024
+#define RTLP_MAX_SEND_BUF_SIZE		4
 
 /* Client and Server states */
-#define RLTP_STATE_ESTABLISHED		1
-#define RLTP_STATE_CLOSED			2
+#define RTLP_STATE_ESTABLISHED		1
+#define RTLP_STATE_CLOSED			2
 
 /* Client only states */
-#define RLTP_STATE_SYN_SENT			3
-#define RLTP_STATE_FIN_WAIT			4
+#define RTLP_STATE_SYN_SENT			3
+#define RTLP_STATE_FIN_WAIT			4
 
 /* Server only states */
-#define RLTP_STATE_LISTEN			5
-#define RLTP_STATE_TIME_WAIT		6
+#define RTLP_STATE_LISTEN			5
+#define RTLP_STATE_TIME_WAIT		6
 
 /* Structure of the header */
-struct rltp_hdr {
+struct rtlp_hdr {
 	uint32_t type;			/* The type of packet */
 	uint32_t seqnbr;		/* The sequence number of the packet */
 	uint32_t total_msg_size; /* The total size of the file being sent - only
@@ -60,23 +60,25 @@ struct rltp_hdr {
 
 /* Structure to store the packet which was sent/received */
 struct pkbuf {
-	struct rltp_hdr hdr;		/* Header of the packet */
+	struct rtlp_hdr hdr;		/* Header of the packet */
 	int len;					/* Length of the payload and header */
-	char payload[RLTP_MAX_PAYLOAD_SIZE]; 	/* Payload of packet */
+	char payload[RTLP_MAX_PAYLOAD_SIZE]; 	/* Payload of packet */
 };
 
 /* Client PCB */
-struct rltp_client_pcb {
+struct rtlp_client_pcb {
 	int sockfd;			/* Corresponding UDP socket */
 	int state;			/* Connection state */
 	/* Current active pkbuf on the network */
-	struct pkbuf send_buf[RLTP_MAX_SEND_BUF_SIZE]; 		
+	struct pkbuf send_buf[RTLP_MAX_SEND_BUF_SIZE]; 		
 
 	/* Your extensions here */
+   struct sockaddr_in serv_addr;  /* The address of the server connected */
+
 };
 
 /* Server PCB */
-struct rltp_server_pcb {
+struct rtlp_server_pcb {
 	int sockfd;			/* Corresponding UDP packet */
 	int state;			/* Connection state */
 
@@ -87,7 +89,7 @@ struct rltp_server_pcb {
 
 /**************************** Client Prototypes *****************************/
 
-int rltp_connect(struct rltp_client_pcb *cpcb, char *dst_addr, int dst_port);
+int rtlp_connect(struct rtlp_client_pcb *cpcb, char *dst_addr, int dst_port);
 /*
  * Functionality:
  * Called by the client to establish a connection to the server. Performs a 
@@ -103,7 +105,7 @@ int rltp_connect(struct rltp_client_pcb *cpcb, char *dst_addr, int dst_port);
  * 		0 on success, -1 on failure
  */
 
-int rltp_close(struct rltp_client_pcb *cpcb);
+int rtlp_close(struct rtlp_client_pcb *cpcb);
 /*
  * Functionality:
  * Called by the client to terminate a connection. Performs a 2-way connection
@@ -121,7 +123,7 @@ int rltp_close(struct rltp_client_pcb *cpcb);
  * 		0 on success, -1 on failure
  */
 
-int rltp_client_reset(struct rltp_client_pcb *cpcb);
+int rtlp_client_reset(struct rtlp_client_pcb *cpcb);
 /*
  * Functionality:
  * Called by the client to reset a connection. Independent of the state of the
@@ -135,18 +137,18 @@ int rltp_client_reset(struct rltp_client_pcb *cpcb);
  * 		0 on success, -1 on failure
  */
 
-int strp_transfer(struct rltp_client_pcb *cpcb, void *data, int len, 
+int strp_transfer(struct rtlp_client_pcb *cpcb, void *data, int len, 
 		char* outfile);
 /*
  * Functionality:
  * Called by the client application to send a data packet to the server. The 
- * maximum number of bytes the function accepts is RLTP_MAX_PAYLOAD_SIZE.
+ * maximum number of bytes the function accepts is RTLP_MAX_PAYLOAD_SIZE.
  *
  * Since our protocol is implemented at the application layer, we cannot rely
  * on the kernel to do all the asyncronous ARQ processing such as receiving 
  * and processing of ACKs, managing time-outs, retransmitting data packets etc
  * . To simplify things, we can do all the ARQ processing within a
- * single flow of control, i.e. whenever rltp_send is called.
+ * single flow of control, i.e. whenever rtlp_send is called.
  *
  * The function therefore needs to provide functionality such as the 
  * following:
@@ -182,7 +184,7 @@ int strp_transfer(struct rltp_client_pcb *cpcb, void *data, int len,
 
 /**************************** Server Prototypes *****************************/
 
-int rltp_listen(struct rltp_server_pcb *spcb, int port);
+int rtlp_listen(struct rtlp_server_pcb *spcb, int port);
 /* 
  * Functionality:
  * The function opens a UDP socket on the specified port and initialised the 
@@ -196,7 +198,7 @@ int rltp_listen(struct rltp_server_pcb *spcb, int port);
  * 0 on success, -1 on failure
  */
 
-int rltp_accept(struct rltp_server_pcb *spcb);
+int rtlp_accept(struct rtlp_server_pcb *spcb);
 /*
  * Functionality:
  * The function blocks and waits for SYN packers. It then performs the 2-way
@@ -211,7 +213,7 @@ int rltp_accept(struct rltp_server_pcb *spcb);
  * 0 on success, -1 on failure
  */
 
-int rltp_server_reset(struct rltp_server_pcb *spcb);
+int rtlp_server_reset(struct rtlp_server_pcb *spcb);
 /*
  * Functionality:
  * Independent of the state of the connection (except of the CLOSED state), 
@@ -226,7 +228,7 @@ int rltp_server_reset(struct rltp_server_pcb *spcb);
  * 0 on success, -1 on failure
  */
 
-int rltp_transfer_loop(struct rltp_server_pcb *spcb);
+int rtlp_transfer_loop(struct rtlp_server_pcb *spcb);
 
 /*
  * Functionality:
@@ -238,7 +240,7 @@ int rltp_transfer_loop(struct rltp_server_pcb *spcb);
  * handshake.
  *
  * The function should react to any protocol error, i.e. unexpected behaviour 
- * of the client with calling rltp_server_reset() and aborting.
+ * of the client with calling rtlp_server_reset() and aborting.
  *
  * Parameters:
  * 		spcb		: server PCB
