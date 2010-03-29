@@ -36,7 +36,7 @@
 /*************************** RTLP Protocol State ****************************/
 /* Max payload */
 #define RTLP_MAX_PAYLOAD_SIZE		1024
-#define RTLP_MAX_SEND_BUF_SIZE		4
+#define RTLP_MAX_SEND_BUF_SIZE	24	
 
 /* Client and Server states */
 #define RTLP_STATE_ESTABLISHED		1
@@ -74,7 +74,7 @@ struct rtlp_client_pcb {
 
 	/* Your extensions here */
    struct sockaddr_in serv_addr;  /* The address of the server connected */
-
+   int window_size;  /* Window size chosen by the application, must be < RTLP_MAX_SEND_BUF_SIZE*/
 };
 
 /* Server PCB */
@@ -83,6 +83,7 @@ struct rtlp_server_pcb {
 	int state;			/* Connection state */
 
 	/* Your extensions here */
+   int window_size;
 };
 
 /*************************** Function Prototypes ****************************/
@@ -137,14 +138,14 @@ int rtlp_client_reset(struct rtlp_client_pcb *cpcb);
  * 		0 on success, -1 on failure
  */
 
-int strp_transfer(struct rtlp_client_pcb *cpcb, void *data, int len, 
+int rtlp_transfer(struct rtlp_client_pcb *cpcb, void *data, int len, 
 		char* outfile);
 /*
  * Functionality:
  * Called by the client application to send a data packet to the server. The 
  * maximum number of bytes the function accepts is RTLP_MAX_PAYLOAD_SIZE.
  *
- * Since our protocol is implemented at the application layer, we cannot rely
+ * Since our protocol is implemented at the application layer, we cannot relyq
  * on the kernel to do all the asyncronous ARQ processing such as receiving 
  * and processing of ACKs, managing time-outs, retransmitting data packets etc
  * . To simplify things, we can do all the ARQ processing within a
