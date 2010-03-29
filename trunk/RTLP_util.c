@@ -1,6 +1,8 @@
-#include "tools.h"
+#include "RTLP_util.h"
 
 struct pkbuf* create_pkbuf(struct pkbuf* buff, int type,int seqnbr,int msg_size, char * payload){
+
+   printf(">create_pkbuf\n");
 
 	struct rtlp_hdr hdr;
   int payload_size;
@@ -26,13 +28,30 @@ struct pkbuf* create_pkbuf(struct pkbuf* buff, int type,int seqnbr,int msg_size,
    } else {
      buff->len = 0;
    }
-	memcpy(&buff->hdr,&hdr,sizeof(hdr));
+  memcpy(&buff->hdr,&hdr,sizeof(hdr));
 
-	return buff;
+  printf("<create_pkbuf\n\n");
+
+  return buff;
 
 }
 
+int create_udp_payload(struct pkbuf* packet, char * rtlp_packet){
+
+  bzero(rtlp_packet, sizeof(rtlp_packet));
+  memcpy(rtlp_packet,&packet->hdr.type,4);
+  memcpy(rtlp_packet+4,&packet->hdr.seqnbr,4);
+  memcpy(rtlp_packet+8,&packet->hdr.total_msg_size,4);
+  memcpy(rtlp_packet+12,packet->payload,packet->len);
+  printf("Data set\n");
+
+}
+
+
+
 int send_packet(struct pkbuf* packet, int sockfd, struct sockaddr_in serv_addr){
+
+  printf(">send_packet\n");
 
   char rtlp_packet[RTLP_MAX_PAYLOAD_SIZE+12];
 
@@ -43,6 +62,7 @@ int send_packet(struct pkbuf* packet, int sockfd, struct sockaddr_in serv_addr){
   memcpy(rtlp_packet+12,packet->payload,packet->len);
   printf("Data set\n");
   
+
   /* write message to socket */
   if(sendto(sockfd, rtlp_packet, strlen(rtlp_packet), 0, (struct sockaddr *) &serv_addr, sizeof(serv_addr)) < 0)
   {
@@ -50,6 +70,9 @@ int send_packet(struct pkbuf* packet, int sockfd, struct sockaddr_in serv_addr){
     return -1;
   }
   printf("Packet sent %d\n",  strlen(rtlp_packet));
+  
+  printf("<send_packet\n\n");
+
   return 0;
 
 }
