@@ -1,11 +1,10 @@
 #include "RTLP_util.h"
 
-struct pkbuf* create_pkbuf(struct pkbuf* buff, int type,int seqnbr,int msg_size, char * payload){
+struct pkbuf* create_pkbuf(struct pkbuf* buff, int type,int seqnbr,int msg_size, char * payload, int len){
 
-   printf(">create_pkbuf\n");
+  printf(">create_pkbuf\n");
 
 	struct rtlp_hdr hdr;
-  int payload_size;
 
 	hdr.type = type;
 	hdr.seqnbr = seqnbr;
@@ -13,15 +12,14 @@ struct pkbuf* create_pkbuf(struct pkbuf* buff, int type,int seqnbr,int msg_size,
 
 
   if(payload != NULL){
-    payload_size = sizeof(payload);
-		if (payload_size > RTLP_MAX_PAYLOAD_SIZE){
-		  fprintf(stderr,"payload exceed max size (%d)\n", payload_size);
+		if (len > RTLP_MAX_PAYLOAD_SIZE){
+		  fprintf(stderr,"payload exceed max size (%d)\n",len );
 		  return NULL;
 		}
-		if(payload_size>0) {
-		  printf("Copying payload %d\n",payload_size);
-		  memcpy(buff->payload,payload,payload_size);
-		  buff->len = payload_size;
+		if(len>0) {
+		  printf("Copying payload %d\n",len);
+		  memcpy(buff->payload,payload,len);
+		  buff->len = len;
 		} else {
 		  buff->len = 0;
 		}
@@ -89,7 +87,7 @@ struct pkbuf* udp_to_pkbuf(struct pkbuf* pkbuffer, char * udppacket){
   memcpy(&total_msg_size,udppacket+8,4);
   payload= udppacket+12;
   
-  return create_pkbuf(pkbuffer,type,seqnbr,total_msg_size,payload);
+  return create_pkbuf(pkbuffer,type,seqnbr,total_msg_size,payload,sizeof(udppacket-12));
 
 }
 

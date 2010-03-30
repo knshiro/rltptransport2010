@@ -5,7 +5,7 @@
 #include <string.h>
 #include <unistd.h>
 
-struct pkbuf* create_pkbuf(struct pkbuf* buff, int type,int seqnbr,int msg_size,char * payload);
+struct pkbuf* create_pkbuf(struct pkbuf* buff, int type,int seqnbr,int msg_size,char * payload,int len);
 
 int create_udp_payload(struct pkbuf* packet, char * rtlp_packet);
 
