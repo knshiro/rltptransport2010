@@ -1,4 +1,4 @@
-#include "rtlp.h"
+
 #include "RTLP_util.h"
 #include <sys/select.h>
 
@@ -15,11 +15,12 @@ int rtlp_connect(struct rtlp_client_pcb *cpcb, char *dst_addr, int dst_port){
 
   struct hostent *server;
 
-  /* Create socket */
-  sockfd = socket(AF_INET, SOCK_DGRAM, 0);
-  if (sockfd < 0) 
-	  perror("ERROR opening socket");
-  printf("Socket created\n");
+  /* Create socket on port 4000*/
+    sockfd=create_socket(4000);
+  if(sockfd<0)  {
+	printf("Impossible to create socket\n");
+	exit(-1);
+  }
 
   cpcb->sockfd = sockfd;
   printf("Socket %d stored in cpcb\n",sockfd);
@@ -45,7 +46,7 @@ int rtlp_connect(struct rtlp_client_pcb *cpcb, char *dst_addr, int dst_port){
   cpcb->serv_addr.sin_port = htons(dst_port);
   printf("Address set\n");
 
-  create_pkbuf(&pkbuffer, RTLP_TYPE_SYN, 0,0, NULL);
+  create_pkbuf(&pkbuffer, RTLP_TYPE_SYN, 0,0, NULL,0);
 
   i=0;
   while(i<3) {
@@ -54,7 +55,8 @@ int rtlp_connect(struct rtlp_client_pcb *cpcb, char *dst_addr, int dst_port){
 	  }
 	  cpcb->state = RTLP_STATE_SYN_SENT;
 	  printf("State set %d\n",  cpcb->state);
-
+  	  /* store the value of the sequence number of the packet sent. If there is a retransmission, the same seq number is used */
+	  cpcb->last_seq_num_sent = 0;
 
 	  /* clear the set ahead of time */
 	  FD_ZERO(&readfds);
@@ -82,6 +84,9 @@ int rtlp_connect(struct rtlp_client_pcb *cpcb, char *dst_addr, int dst_port){
         if ( pkbuffer.hdr.type == RTLP_TYPE_ACK ) {
           printf("Connection successful\n");
           cpcb->state = RTLP_STATE_ESTABLISHED;
+	  /* store the value of the sequence number of the packet received !!!*/
+	  cpcb->last_seq_num_received = pkbuffer.hdr.seqnbr;
+	  printf("TEST:(=1)pkbuffer->hdr.seqnbr: %i\n",pkbuffer.hdr.seqnbr);
           return 0;
         } else {
           rtlp_client_reset(cpcb);
@@ -98,7 +103,7 @@ int rtlp_connect(struct rtlp_client_pcb *cpcb, char *dst_addr, int dst_port){
 int rtlp_client_reset(struct rtlp_client_pcb *cpcb){
 
   struct pkbuf pkbuffer;
-  create_pkbuf(&pkbuffer, RTLP_TYPE_RST, 0,0, NULL);
+  create_pkbuf(&pkbuffer, RTLP_TYPE_RST, 0,0, NULL,0);
   
   printf("Packet created\n");
   
@@ -110,6 +115,7 @@ int rtlp_client_reset(struct rtlp_client_pcb *cpcb){
   return 0;
 
 }
+
 
 
 int rtlp_transfer2(struct rtlp_client_pcb *cpcb, void *data, int len,
@@ -148,7 +154,7 @@ int rtlp_transfer2(struct rtlp_client_pcb *cpcb, void *data, int len,
       if(cpcb->send_buf[j].hdr.seqnbr == -1){ 
         bzero(payloadbuff,sizeof(payloadbuff));
         memcpy(payloadbuff,data+i*RTLP_MAX_PAYLOAD_SIZE,RTLP_MAX_PAYLOAD_SIZE);
-        create_pkbuf(&pkbuffer, RTLP_TYPE_DATA,i,msg_size,payloadbuff); 
+        create_pkbuf(&pkbuffer, RTLP_TYPE_DATA,i,msg_size,payloadbuff,RTLP_MAX_PAYLOAD_SIZE); 
         memcpy(&cpcb->send_buf[j],&pkbuffer,sizeof(struct pkbuf));
         i++;
       }
@@ -219,6 +225,7 @@ int rtlp_transfer2(struct rtlp_client_pcb *cpcb, void *data, int len,
   return 0;
 }        
 
+
 int rtlp_transfer(struct rtlp_client_pcb *cpcb, void *data, int len,
                     char* outfile){
   int i,j,k,msg_size,nb_timeout=0,srv;
@@ -252,7 +259,7 @@ int rtlp_transfer(struct rtlp_client_pcb *cpcb, void *data, int len,
       if(cpcb->send_buf[j].hdr.seqnbr == -1){ 
         bzero(payloadbuff,sizeof(payloadbuff));
         memcpy(payloadbuff,data+i*RTLP_MAX_PAYLOAD_SIZE,RTLP_MAX_PAYLOAD_SIZE);
-        create_pkbuf(&pkbuffer, RTLP_TYPE_DATA,i,msg_size,payloadbuff); 
+        create_pkbuf(&pkbuffer, RTLP_TYPE_DATA,i,msg_size,payloadbuff,RTLP_MAX_PAYLOAD_SIZE); 
         memcpy(&cpcb->send_buf[j],&pkbuffer,sizeof(struct pkbuf));
         i++;
       }
@@ -322,4 +329,78 @@ int rtlp_transfer(struct rtlp_client_pcb *cpcb, void *data, int len,
   }
   return 0;
 }
+
+
+int rtlp_close(struct rtlp_client_pcb *cpcb)
+{
+ printf("<rtlp_close\n"); 
+  int sockfd,i,srv;
+  sockfd=cpcb->sockfd;
+  struct pkbuf *pkbuffer;
+  pkbuffer = (struct pkbuf*)malloc(sizeof(struct pkbuf));
+  struct timeval tv;
+  char rtlp_packet[RTLP_MAX_PAYLOAD_SIZE+12];
+  fd_set readfds;
+
+  create_pkbuf(pkbuffer, RTLP_TYPE_FIN, cpcb->last_seq_num_received+1,0, NULL,0);
+
+/* check that all the data has been received if the server is sending (size received is update everytime we receive a packet) or that the last packet has been acknowledged if the client is sending */
+
+  if(cpcb->state = 1 && (pkbuffer->hdr.total_msg_size == cpcb->size_received 
+	|| cpcb->last_seq_num_received == cpcb->last_seq_num_sent +1)) {
+  	i=0;
+  	while(i<3) {
+		if(send_packet(pkbuffer, sockfd, cpcb->serv_addr) <0){
+		  	exit(-1);
+	 	}
+
+		if(cpcb->last_seq_num_received == cpcb->last_seq_num_sent +1) {
+		cpcb->state = RTLP_STATE_FIN_WAIT;
+		printf("RTLP_STATE_FIN_WAIT 2\n");
+		}
+		printf("last_seq_num_received : %i and last_seq_num_sent: %i\n",cpcb->last_seq_num_received,cpcb->last_seq_num_sent);
+
+		/* clear the set ahead of time */
+		FD_ZERO(&readfds);
+		/* add our descriptors to the set */
+		FD_SET(sockfd, &readfds);
+
+		tv.tv_sec = 1;
+     		srv = select(sockfd+1, &readfds, NULL, NULL, &tv);
+		if (srv == -1) {
+			perror("select"); // error occurred in select()
+		} else if (srv == 0) {
+			printf("Timeout occurred! No data after 2 seconds.\n");
+       			i++;
+		}else {
+		  	// one or both of the descriptors have data
+		 	if (FD_ISSET(sockfd, &readfds)) {
+		    		bzero(rtlp_packet, sizeof(rtlp_packet));
+        	  		if(recv(sockfd,rtlp_packet,sizeof(rtlp_packet),0) < 0) {
+		     			perror("Couldn't receive from socket");
+		  		}
+
+        			udp_to_pkbuf(pkbuffer, rtlp_packet);
+        			printf("Packet of type %d received\n", pkbuffer->hdr.type );
+        			if ( pkbuffer->hdr.type == RTLP_TYPE_ACK ) {
+         			 	printf("Termination successful\n");
+					if(cpcb->state != RTLP_STATE_FIN_WAIT) {
+						cpcb->state = RTLP_STATE_FIN_WAIT;
+						printf("RTLP_STATE_FIN_WAIT 1\n");
+					}
+         			 	cpcb->state = RTLP_STATE_CLOSED;
+          				return 0;
+        			} else {
+        				rtlp_client_reset(cpcb);
+          				printf("Server misbehaviour\n");
+          				return -1;
+        			}
+	   		}
+	 	}
+  	}
+  }
+  printf("<rtlp_close\n"); 
+  return -1;
+}
+
 

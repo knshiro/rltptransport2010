@@ -46,7 +46,6 @@ int create_udp_payload(struct pkbuf* packet, char * rtlp_packet){
 }
 
 
-
 int send_packet(struct pkbuf* packet, int sockfd, struct sockaddr_in serv_addr){
 
   printf(">send_packet\n");
@@ -91,6 +90,33 @@ struct pkbuf* udp_to_pkbuf(struct pkbuf* pkbuffer, char * udppacket){
 
 }
 
+
+/* create a socket and bind it to the local address and a port  */
+int create_socket(int local_port){
+  int sockfd;
+  int length = sizeof(struct sockaddr_in);
+  struct sockaddr_in client_addr;
+
+  /*create socket*/
+  sockfd = socket(AF_INET, SOCK_DGRAM, 0);
+  if (sockfd < 0) 
+	  perror("ERROR opening socket");
+  printf("Socket created\n");
+
+  /* prepare attachment addrese = local addresse */
+  client_addr.sin_family = AF_INET;
+
+  /*  Give the local IP address and assign a port*/
+  client_addr.sin_addr.s_addr=htonl(INADDR_ANY);
+  client_addr.sin_port = htons(local_port);
+
+  if(bind(sockfd,(struct sockaddr *)&client_addr,length) == -1) {
+  perror("Impossible to bind socket to local address\n");
+  close(sockfd);
+  return -1;
+  }
+return sockfd;
+}
 
 
 
