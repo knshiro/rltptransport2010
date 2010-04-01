@@ -75,6 +75,9 @@ struct rtlp_client_pcb {
 	/* Your extensions here */
    struct sockaddr_in serv_addr;  /* The address of the server connected */
    int window_size;  /* Window size chosen by the application, must be < RTLP_MAX_SEND_BUF_SIZE*/
+   int size_received; /* Total size of the data received so far */
+   int last_seq_num_received; /* last sequence number received */
+   int last_seq_num_sent; /* last sequence number received */
 };
 
 /* Server PCB */
@@ -83,7 +86,9 @@ struct rtlp_server_pcb {
 	int state;			/* Connection state */
 
 	/* Your extensions here */
-   int window_size;
+	struct pkbuf send_buf[RTLP_MAX_SEND_BUF_SIZE]; 	
+  	int window_size;
+	struct sockaddr_in client_addr;  /* The address of the client connected */
 };
 
 /*************************** Function Prototypes ****************************/
