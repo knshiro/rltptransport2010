@@ -13,4 +13,4 @@ int send_packet(struct pkbuf* packet, int sockfd, struct sockaddr_in serv_addr);
 
 struct pkbuf* udp_to_pkbuf(struct pkbuf* pkbuffer, char * udppacket);
 
-int create_socket(int local_port);
+int create_socket(int port);

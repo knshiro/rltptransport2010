@@ -92,10 +92,10 @@ struct pkbuf* udp_to_pkbuf(struct pkbuf* pkbuffer, char * udppacket){
 
 
 /* create a socket and bind it to the local address and a port  */
-int create_socket(int local_port){
+int create_socket(int port){
   int sockfd;
-  int length = sizeof(struct sockaddr_in);
   struct sockaddr_in client_addr;
+  int length = sizeof(struct sockaddr_in);
 
   /*create socket*/
   sockfd = socket(AF_INET, SOCK_DGRAM, 0);
@@ -108,14 +108,18 @@ int create_socket(int local_port){
 
   /*  Give the local IP address and assign a port*/
   client_addr.sin_addr.s_addr=htonl(INADDR_ANY);
-  client_addr.sin_port = htons(local_port);
+  
 
-  if(bind(sockfd,(struct sockaddr *)&client_addr,length) == -1) {
-  perror("Impossible to bind socket to local address\n");
-  close(sockfd);
-  return -1;
+  if(port>-1)
+  {
+	client_addr.sin_port = htons(port);
+  	if(bind(sockfd,(struct sockaddr *)&client_addr,length) == -1) {
+ 		perror("Impossible to bind socket to local address\n");
+  		close(sockfd);
+  		return -1;
+ 	}
   }
-return sockfd;
+  return sockfd;
 }
 
 
