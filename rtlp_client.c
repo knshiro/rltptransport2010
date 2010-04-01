@@ -15,8 +15,8 @@ int rtlp_connect(struct rtlp_client_pcb *cpcb, char *dst_addr, int dst_port){
 
   struct hostent *server;
 
-  /* Create socket on port 4000*/
-    sockfd=create_socket(4000);
+  /* Create socket */
+    sockfd=create_socket(-1);
   if(sockfd<0)  {
 	printf("Impossible to create socket\n");
 	exit(-1);
