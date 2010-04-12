@@ -11,9 +11,8 @@ int main(int argc, char **argv)
 {
 struct rtlp_server_pcb spcb;
 int check = rtlp_listen(&spcb, 4500);
-printf("Check(0): %i\n",check);
-spcb.state=5;
+printf("rtlp_listen ends: %i\n",check);
 check = rtlp_accept(&spcb);
-printf("Check: %i\n",check);
+printf("rtlp_accept ends: %i\n",check);
 return 0;
 }
