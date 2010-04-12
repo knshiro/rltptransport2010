@@ -12,9 +12,9 @@ int main(int argc, char **argv)
 struct rtlp_client_pcb *cpcb = (struct rtlp_client_pcb *)malloc(sizeof(struct rtlp_client_pcb));
 char *dst_addr= "127.0.0.1";
 int check = rtlp_connect(cpcb, dst_addr,4500);
-printf("%i\n",check);
+printf("rtlp_connect ends : %i\n",check);
 int check2 = rtlp_close(cpcb);
-printf("%i\n",check2);
+printf("%rtlp_close ends: i\n",check2);
 
 return 0;
 }
