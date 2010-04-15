@@ -17,6 +17,7 @@
 
 int rtlp_listen(struct rtlp_server_pcb *spcb, int port){
 
+
   int sockfd;
   //create socket
   sockfd = create_socket(port);
@@ -29,7 +30,7 @@ int rtlp_listen(struct rtlp_server_pcb *spcb, int port){
   spcb->sockfd = sockfd;
   printf("Socket %d stored in spcb\n",sockfd);
   spcb->state=5;
-return 0;
+  return 0;
 }
 
 
@@ -46,9 +47,9 @@ int rtlp_accept(struct rtlp_server_pcb *spcb){
   char rtlp_packet[RTLP_MAX_PAYLOAD_SIZE+12];
   struct sockaddr_in from;
   char buf[1024];
-
+  int out_loop;
   fd_set readfds;
-  
+    
   fromlen = sizeof(from);
 
   while(1) {
@@ -87,10 +88,16 @@ int rtlp_accept(struct rtlp_server_pcb *spcb){
 
 	//create pkbuf and send packet
   			create_pkbuf(&pkbuffer, RTLP_TYPE_ACK, 1,0, NULL,0);
-  			if(send_packet(&pkbuffer, spcb->sockfd, from) < 0){
+  			if((out_loop = send_packet(&pkbuffer, spcb->sockfd, from)) < 0){
 				printf("probleme: cannot send packet\n");
 				exit(-1);
 	 		 }
+			if(out_loop == 0) {
+				spcb->state = RTLP_STATE_ESTABLISHED;
+				printf("Connection successful\n");
+				//fork
+				break;
+			}
 
 		}
     	}
@@ -122,6 +129,10 @@ int rtlp_transfer_loop(struct rtlp_server_pcb *spcb)
   char *filename=(char *)malloc(sizeof(char));
   void* data=(void *)malloc(sizeof(void));
 
+  struct sockaddr_in from;
+  unsigned int fromlen;
+  fromlen = sizeof(from);
+  
 
 while(1) {
   //First, we check if the client asked for something and at the end if it sends a FIN packet.
@@ -145,7 +156,8 @@ while(1) {
         if (FD_ISSET(spcb->sockfd, &readfds)) {
           
         	bzero(udp_buffer, sizeof(udp_buffer));
-          	if(recv(spcb->sockfd,udp_buffer,sizeof(udp_buffer),0) < 0) {
+          	//if(recv(spcb->sockfd,udp_buffer,sizeof(udp_buffer),0) < 0) {
+		if(recvfrom(spcb->sockfd,udp_buffer,sizeof(udp_buffer), 0, (struct sockaddr*)&from, &fromlen) < 0) {
           		perror("Couldn't receive from socket");
 		}
         	udp_to_pkbuf(&pkbuffer, udp_buffer);
@@ -194,16 +206,20 @@ while(1) {
 				//Put the file into void* data. We put all the file in data. It will be cut after.
 				fread(data,longlen,1,f);
 			}
+		}
 			//The server receives a FIN packet
-			else if(pkbuffer.hdr.type == RTLP_TYPE_FIN) {
-				create_pkbuf(&pkbuffer, RTLP_TYPE_FIN,pkbuffer.hdr.seqnbr+1,0, NULL,0);
+		else if(pkbuffer.hdr.type == RTLP_TYPE_FIN) {
+				spcb->last_seq_num_received = pkbuffer.hdr.seqnbr;
+				create_pkbuf(&pkbuffer, RTLP_TYPE_ACK,spcb->last_seq_num_received+1,0, NULL,0);
   				printf("Packet FIN created\n");
-  				if(send_packet(&pkbuffer, spcb->sockfd, spcb->client_addr) <0){
+  				if(send_packet(&pkbuffer, spcb->sockfd, from) <0){
     					return -1;
   				}
   				spcb->state = RTLP_STATE_CLOSED;
-			}
+				printf("Termination successful\n");
+				break;
 		}
+		
 		
   	}
   }			
@@ -232,7 +248,7 @@ while(1) {
     	//Send the packets in the buffer
     	for(k=0;k<spcb->window_size;k++){
    	  	if(spcb->send_buf[j].hdr.seqnbr != -1){
-       		send_packet(&spcb->send_buf[j], spcb->sockfd, spcb->client_addr);
+       		send_packet(&spcb->send_buf[j], spcb->sockfd, from);
         	j++;
       		}
 	}
