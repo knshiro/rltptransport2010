@@ -48,7 +48,10 @@ int create_udp_payload(struct pkbuf* packet, char * rtlp_packet){
 
 int send_packet(struct pkbuf* packet, int sockfd, struct sockaddr_in serv_addr){
 
-  printf(">send_packet\n");
+  printf(">>send_packet\n");
+  printf("Packet Buff type: %d\n",packet->hdr.type);
+  printf("Packet Buff seqnbr: %d\n",packet->hdr.seqnbr);
+  printf("Packet Buff total_msg_size: %d\n",packet->hdr.total_msg_size);
   if(packet->len > RTLP_MAX_PAYLOAD_SIZE){
     return -1;            //TODO stderr
   }
@@ -60,7 +63,10 @@ int send_packet(struct pkbuf* packet, int sockfd, struct sockaddr_in serv_addr){
   memcpy(rtlp_packet+8,&packet->hdr.total_msg_size,4);
   memcpy(rtlp_packet+12,packet->payload,packet->len);
   printf("Data set\n");
-  printf("seqnbr : %d\n",*rtlp_packet+4);
+  printf("Taille int:%d\n",sizeof(int));
+  printf("Udp packet type : %d\n",*rtlp_packet);
+  printf("Udp packet seqnbr : %d\n",*(rtlp_packet+4));
+  printf("Udp packet total_msg_size : %d\n",*(rtlp_packet+8));
 
   /* write message to socket */
   if(sendto(sockfd, rtlp_packet, packet->len+12, 0, (struct sockaddr *) &serv_addr, sizeof(serv_addr)) < 0)
@@ -70,7 +76,7 @@ int send_packet(struct pkbuf* packet, int sockfd, struct sockaddr_in serv_addr){
   }
   printf("Packet sent %d\n",  strlen(rtlp_packet));
   
-  printf("<send_packet\n\n");
+  printf("<<send_packet\n\n");
 
   return 0;
 
