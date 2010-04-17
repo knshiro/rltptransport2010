@@ -165,7 +165,7 @@ while(1) {
         if (FD_ISSET(spcb->sockfd, &readfds)) {
           
         	bzero(udp_buffer, sizeof(udp_buffer));
-		if(len_packet=recvfrom(spcb->sockfd,udp_buffer, sizeof(udp_buffer), 0, (struct sockaddr*)&from, &fromlen) < 0) {
+		if((len_packet=recvfrom(spcb->sockfd,udp_buffer, sizeof(udp_buffer), 0, (struct sockaddr*)&from, &fromlen)) < 0) {
           		perror("Couldn't receive from socket");
 		}
         	
@@ -279,16 +279,17 @@ while(1) {
     	//Fill the packet buffer
     	while(i<msg_size && j<spcb->window_size){   
       		if(spcb->send_buf[j].hdr.seqnbr == -1){  //Check if the buffer has free space
+			printf("j= %i\n",j);
       			bzero(payloadbuff,sizeof(payloadbuff));
         		memcpy(payloadbuff,data+i*RTLP_MAX_PAYLOAD_SIZE,RTLP_MAX_PAYLOAD_SIZE); //read MAX_PAYLOAD_SIZE and put it in the buffer
         		create_pkbuf(&pkbuffer, RTLP_TYPE_DATA,spcb->last_seq_num_sent + 1,msg_size,payloadbuff,RTLP_MAX_PAYLOAD_SIZE); 
         		memcpy(&spcb->send_buf[j],&pkbuffer,sizeof(struct pkbuf));      		
 			i++;
-			spcb->last_seq_num_sent = spcb->last_seq_num_sent + 1; //Increase the seqnunmber
+			spcb->last_seq_num_sent = spcb->last_seq_num_sent + 1; //Increase the seq. number
       		}
     		j++;
    	}
-    	j=0;// j = number of packets that we sent .
+    	j=0;// j = number of packets that we sent.
     	//Send the packets in the buffer
     	for(k=0;k<spcb->window_size;k++){
    	  	if(spcb->send_buf[j].hdr.seqnbr != -1){
@@ -298,7 +299,7 @@ while(1) {
 	}
 
 	//handle ACKs
-  	while(j>0){  
+  	//while(j>0){  
 		tv.tv_sec = 5;
  		//clear the set ahead of time
 	    	FD_ZERO(&readfds);
@@ -307,10 +308,11 @@ while(1) {
 
 		//If there are already ACKs.
 		while(select(spcb->sockfd+1, &readfds, NULL, NULL, 0)>0) {
+
 			if (FD_ISSET(spcb->sockfd, &readfds)) {
           			
           			bzero(udp_buffer, sizeof(udp_buffer));
-          			if(len_packet=recv(spcb->sockfd,udp_buffer,sizeof(udp_buffer),0) < 0) {
+          			if((len_packet=recv(spcb->sockfd,udp_buffer,sizeof(udp_buffer),0)) < 0) {
             				perror("Couldn't receive from socket");
           			}
           			udp_to_pkbuf(&pkbuffer, udp_buffer,len_packet);
@@ -319,6 +321,7 @@ while(1) {
          			if ( pkbuffer.hdr.type == RTLP_TYPE_ACK ) {  // If the received message is an ACK
             				for(k=0;k<spcb->window_size;k++){           // We delete the acquitted message from the send_packet_buffer
               					if(spcb->send_buf[k].hdr.seqnbr <  pkbuffer.hdr.seqnbr){  
+						
                 				j--;
                 				nb_timeout = 0;
                 				spcb->send_buf[k].hdr.seqnbr = -1;
@@ -335,6 +338,11 @@ while(1) {
           			}
 			}
 			jump_select = 1;
+
+			//clear the set ahead of time
+	    		FD_ZERO(&readfds);
+	    		// add our descriptors to the set 
+	    		FD_SET(spcb->sockfd, &readfds);
         	}
 		//If there were not already ACKs, we wait for some.
 		if(jump_select!=1) {
@@ -342,7 +350,7 @@ while(1) {
 				if (FD_ISSET(spcb->sockfd, &readfds)) {
           
           				bzero(udp_buffer, sizeof(udp_buffer));
-          				if(len_packet=recv(spcb->sockfd,udp_buffer,sizeof(udp_buffer),0) < 0) {
+          				if((len_packet=recv(spcb->sockfd,udp_buffer,sizeof(udp_buffer),0)) < 0) {
             					perror("Couldn't receive from socket");
           				}
           				udp_to_pkbuf(&pkbuffer, udp_buffer,len_packet);
@@ -372,7 +380,7 @@ while(1) {
 		}
 
 
-      	} 
+      	//} 
   }  
 
   //The client sends a file to the server
@@ -400,7 +408,7 @@ while(send==2){
         if (FD_ISSET(spcb->sockfd, &readfds)) {
           
         	bzero(udp_buffer, sizeof(udp_buffer));
-		if(len_packet=recvfrom(spcb->sockfd,udp_buffer,sizeof(udp_buffer), 0, (struct sockaddr*)&from, &fromlen) < 0) {
+		if((len_packet=recvfrom(spcb->sockfd,udp_buffer,sizeof(udp_buffer), 0, (struct sockaddr*)&from, &fromlen)) < 0) {
           		perror("Couldn't receive from socket");
 		}
         	udp_to_pkbuf(&pkbuffer, udp_buffer,len_packet);
@@ -445,7 +453,7 @@ while(send==2){
        		// one or both of the descriptors have data
         	if (FD_ISSET(spcb->sockfd, &readfds)) {
         		bzero(udp_buffer, sizeof(udp_buffer));
-			if(len_packet=recvfrom(spcb->sockfd,udp_buffer,sizeof(udp_buffer), 0, (struct sockaddr*)&from, &fromlen) < 0) {
+			if((len_packet=recvfrom(spcb->sockfd,udp_buffer,sizeof(udp_buffer), 0, (struct sockaddr*)&from, &fromlen)) < 0) {
           			perror("Couldn't receive from socket");
 			}
         		udp_to_pkbuf(&pkbuffer, udp_buffer,len_packet);
