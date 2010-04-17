@@ -274,7 +274,6 @@ int rtlp_transfer(struct rtlp_client_pcb *cpcb, void *data, int len,
   int i,msg_size,done;
   struct pkbuf pkbuffer;
   FILE *output = NULL;
-  char payloadbuff[RTLP_MAX_PAYLOAD_SIZE];
   struct timeval tv;
   time_t current_time;
   fd_set readfds;
@@ -325,7 +324,6 @@ int rtlp_transfer(struct rtlp_client_pcb *cpcb, void *data, int len,
     //Fill the packet buffer
     while(!done && i < cpcb->window_size){
       if(cpcb->send_buf[i].hdr.seqnbr == -1){ 
-        bzero(payloadbuff,sizeof(payloadbuff));
         cpcb->last_seq_num_sent++;
         create_pkbuf(&pkbuffer, RTLP_TYPE_DATA,cpcb->last_seq_num_sent,msg_size,data,len); 
         memcpy(&cpcb->send_buf[i],&pkbuffer,sizeof(struct pkbuf));
@@ -354,7 +352,6 @@ int rtlp_transfer(struct rtlp_client_pcb *cpcb, void *data, int len,
       //Fill the packet buffer
       while(!done && i < cpcb->window_size){
         if(cpcb->send_buf[i].hdr.seqnbr == -1){ 
-          bzero(payloadbuff,sizeof(payloadbuff));
           create_pkbuf(&pkbuffer, RTLP_TYPE_DATA,cpcb->last_seq_num_sent++,msg_size,data,len); 
           memcpy(&cpcb->send_buf[i],&pkbuffer,sizeof(struct pkbuf));
           done = 1; 
@@ -373,8 +370,10 @@ int rtlp_transfer(struct rtlp_client_pcb *cpcb, void *data, int len,
     }
   }
   
-  fclose(output);
-
+  if(output != NULL){
+    fclose(output);
+  }
+  printf("<<<<<Transfert\n");
   return 0;
 }
 
