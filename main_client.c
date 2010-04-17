@@ -32,6 +32,12 @@ check = rtlp_test(cpcb);
 /*
 int check2 = rtlp_close(cpcb);
 printf("rtlp_close ends: %i\n",check2);
+
+cpcb.recv_buf[3].hdr.seqnbr = 3;
+cpcb.recv_buf[2].hdr.seqnbr = 2;
+
+swap(cpcb.recv_buf,2,3);
+printf("Packet 2 : %d, Packet 3 : %d",cpcb.recv_buf[2].hdr.seqnbr,cpcb.recv_buf[3].hdr.seqnbr);
 */
 printf(">>>>1st transfert\n");
 rtlp_transfer(&cpcb,data2,5,"log");

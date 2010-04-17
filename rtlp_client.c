@@ -8,12 +8,25 @@
 int treat_arq(struct rtlp_client_pcb *cpcb, FILE *outfile);
 void print_state_cpcb(struct rtlp_client_pcb *cpcb);
 void write_to_output(struct pkbuf* buffer, FILE *output);
-
+/*
 int compare_int (const int *a, const int *b)
 {
   return (*a > *b) - (*a < *b);
 }
+*/
 
+void swap(struct pkbuf* pkarray,int i, int j){
+
+  int size = sizeof(pkarray);
+  struct pkbuf temp;
+
+  if (i>=size || j>=size){
+    return -1;   //TODO stderr
+  } 
+    temp = pkarray[i];
+    pkarray[i] = pkarray[j];
+    pkarray[j] = temp;
+}
 
 int rtlp_connect(struct rtlp_client_pcb *cpcb, char *dst_addr, int dst_port){
 
@@ -496,8 +509,14 @@ int treat_arq(struct rtlp_client_pcb *cpcb, FILE *output) {
     if(i>0){
       cpcb->last_seq_num_ack =  cpcb->last_seq_num_ack + (i+1) ;
       cpcb->last_seq_num_sent = cpcb->last_seq_num_ack +1;
+      printf("Send ack number %d\n",cpcb->last_seq_num_sent);
       create_pkbuf(&pkbuffer,RTLP_TYPE_ACK,cpcb->last_seq_num_sent,0,NULL,0);
       send_packet(&pkbuffer,cpcb->sockfd,cpcb->serv_addr);
+    }
+    for(i=0;i<cpcb->window_size;i++){
+      if( cpcb->recv_buf[i].hdr.seqnbr != -1 ) {
+        swap(cpcb->recv_buf,i,cpcb->recv_buf[i].hdr.seqnbr - (cpcb->last_seq_num_ack+1));
+      }
     }
   }
 
@@ -513,19 +532,6 @@ int treat_arq(struct rtlp_client_pcb *cpcb, FILE *output) {
 }
 
 /*
-int swap(struct pkbuf* pkarray,int i, int j){
-
-  int size = sizeof(pkarray);
-  struct pkbuf temp;
-
-  if (i>=size || j>=size){
-    return -1;   //TODO stderr
-  } 
-    temp = pkarray[i];
-    pkarray[i] = pkarray[j];
-    pkarray[j] = pkarray[i];
-}
-
 int sort_buff(struct pkbuf* pkarray, int len){
 
   int i,min=0;
@@ -572,7 +578,7 @@ void write_to_output(struct pkbuf* buffer, FILE *output){
     printf("%s",buffer->payload);
   }
   else {
-    printf("Writing in the file %d bytes",buffer->len);
+    printf("Writing in the file %d bytes\n",buffer->len);
     fwrite(buffer->payload,sizeof(char),buffer->len,output);
   }
 
