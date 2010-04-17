@@ -15,7 +15,7 @@ int compare_int (const int *a, const int *b)
 }
 */
 
-void swap(struct pkbuf* pkarray,int i, int j){
+int swap(struct pkbuf* pkarray,int i, int j){
 
   int size = sizeof(pkarray);
   struct pkbuf temp;
@@ -26,6 +26,8 @@ void swap(struct pkbuf* pkarray,int i, int j){
     temp = pkarray[i];
     pkarray[i] = pkarray[j];
     pkarray[j] = temp;
+
+ return 0;
 }
 
 int rtlp_connect(struct rtlp_client_pcb *cpcb, char *dst_addr, int dst_port){
@@ -122,6 +124,7 @@ int rtlp_connect(struct rtlp_client_pcb *cpcb, char *dst_addr, int dst_port){
             cpcb->recv_buf[i].hdr.seqnbr=-1;
             cpcb->send_buf[i].hdr.seqnbr=-1;
           }
+          cpcb->size_received = 0;
           printf(">Buffers init checked\n");
 
           return 0;
@@ -491,12 +494,15 @@ int treat_arq(struct rtlp_client_pcb *cpcb, FILE *output) {
     i = pkbuffer.hdr.seqnbr - (cpcb->last_seq_num_ack+1); 
     printf("Place in the buffer : %d\n",i);
     printf("Seqnbr of packet i : %d\n",cpcb->recv_buf[i].hdr.seqnbr);
-    if( (i >-1) && ( i < cpcb->window_size )  && (cpcb->recv_buf[i].hdr.seqnbr == -1)){
+    if( (i>-1) && ( i < cpcb->window_size )  && (cpcb->recv_buf[i].hdr.seqnbr == -1)){
       printf("Packet put in the buffer slot %d\n",i);
       memcpy(&cpcb->recv_buf[i],&pkbuffer,sizeof(struct pkbuf));
     }
-    else{         // Erreur pas de place dans le buffer
-      return -1;
+    else{      // Erreur pas de place dans le buffer
+      if ( i>=0 && (( i > cpcb->window_size ) || (cpcb->recv_buf[i].hdr.seqnbr == -1)) ){
+        printf("!!!!!!!!!!!!!!!!!!!!!ERROR!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
+        return -1;
+      }
     }
 
     i=0;
@@ -506,16 +512,9 @@ int treat_arq(struct rtlp_client_pcb *cpcb, FILE *output) {
       i++;
     }
     if(i>0){
-      cpcb->last_seq_num_ack =  cpcb->last_seq_num_ack + (i+1) ;
+      printf("Max i written : %d\n",i);
+      cpcb->last_seq_num_ack =  cpcb->last_seq_num_ack + i ;
       cpcb->last_seq_num_sent = cpcb->last_seq_num_ack +1;
-      printf("Send ack number %d\n",cpcb->last_seq_num_sent);
-      create_pkbuf(&pkbuffer,RTLP_TYPE_ACK,cpcb->last_seq_num_sent,0,NULL,0);
-      send_packet(&pkbuffer,cpcb->sockfd,cpcb->serv_addr);
-    }
-    for(i=0;i<cpcb->window_size;i++){
-      if( cpcb->recv_buf[i].hdr.seqnbr != -1 ) {
-        swap(cpcb->recv_buf,i,cpcb->recv_buf[i].hdr.seqnbr - (cpcb->last_seq_num_ack+1));
-      }
     }
   }
 
@@ -526,6 +525,16 @@ int treat_arq(struct rtlp_client_pcb *cpcb, FILE *output) {
     return -1;
   }
 
+  // ACK last ack number
+  printf("Send ack number %d\n",cpcb->last_seq_num_sent);
+  create_pkbuf(&pkbuffer,RTLP_TYPE_ACK,cpcb->last_seq_num_sent,0,NULL,0);
+  send_packet(&pkbuffer,cpcb->sockfd,cpcb->serv_addr);
+
+  for(i=0;i<cpcb->window_size;i++){
+    if( cpcb->recv_buf[i].hdr.seqnbr != -1 ) {
+      swap(cpcb->recv_buf,i,cpcb->recv_buf[i].hdr.seqnbr - (cpcb->last_seq_num_ack+1));
+    }
+  }
 
   return 0;
 }
@@ -571,13 +580,14 @@ void print_state_cpcb(struct rtlp_client_pcb *cpcb){
   printf("=================CPCB state===================\n");
 }
 
-void write_to_output(struct pkbuf* buffer, FILE *output){
+void write_to_output(struct pkbuf* buffer, FILE *output, struct rtlp_client_pcb *cpcb){
   
   if(output == NULL){
     printf("%s",buffer->payload);
   }
   else {
     printf("Writing in the file %d bytes\n",buffer->len);
+    cpcb->size_received++;
     fwrite(buffer->payload,sizeof(char),buffer->len,output);
   }
 
