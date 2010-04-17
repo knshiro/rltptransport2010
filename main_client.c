@@ -34,15 +34,17 @@ int check2 = rtlp_close(cpcb);
 printf("rtlp_close ends: %i\n",check2);
 */
 printf(">>>>1st transfert\n");
-rtlp_transfer(&cpcb,data2,5,NULL);
+rtlp_transfer(&cpcb,data2,5,"log");
+
 while(1){
 
-scanf("%c",&cmd);
-if(cmd=='n'){
-  rtlp_transfer(&cpcb,NULL,0,NULL);
-}
-
-
+	scanf("%c",&cmd);
+	if(cmd=='n'){
+		rtlp_transfer(&cpcb,NULL,0,"log");
+	}
+	if(cmd=='q'){
+		break;
+	}
 }
 
 return 0;

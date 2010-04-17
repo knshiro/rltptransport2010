@@ -5,7 +5,9 @@
 #include "rtlp.h"
 
 
-int treat_arq(struct rtlp_client_pcb *cpcb, char *outfile);
+int treat_arq(struct rtlp_client_pcb *cpcb, FILE *outfile);
+void print_state_cpcb(struct rtlp_client_pcb *cpcb);
+void write_to_output(struct pkbuf* buffer, FILE *output);
 
 int compare_int (const int *a, const int *b)
 {
@@ -258,7 +260,7 @@ int rtlp_transfer(struct rtlp_client_pcb *cpcb, void *data, int len,
 
   int i,msg_size,done;
   struct pkbuf pkbuffer;
-
+  FILE *output = NULL;
   char payloadbuff[RTLP_MAX_PAYLOAD_SIZE];
   struct timeval tv;
   time_t current_time;
@@ -273,7 +275,16 @@ int rtlp_transfer(struct rtlp_client_pcb *cpcb, void *data, int len,
   if (cpcb == NULL || cpcb->state != RTLP_STATE_ESTABLISHED){
     return -1;                        //TODO stderr
   }
- 
+
+  print_state_cpcb(cpcb);
+
+  if(outfile != NULL){
+    printf("Out = %s\n",outfile);
+    output = fopen( outfile, "a");
+  }
+
+
+
   //Check first time if there are ack in the buffer
 
   /* clear the set ahead of time */
@@ -284,7 +295,7 @@ int rtlp_transfer(struct rtlp_client_pcb *cpcb, void *data, int len,
   tv.tv_sec = 0;
   while(select(cpcb->sockfd+1, &readfds, NULL, NULL, &tv)>0){
     if (FD_ISSET(cpcb->sockfd, &readfds)) {
-      treat_arq(cpcb,outfile);
+      treat_arq(cpcb,output);
     }
     /* clear the set ahead of time */
     FD_ZERO(&readfds);
@@ -302,7 +313,8 @@ int rtlp_transfer(struct rtlp_client_pcb *cpcb, void *data, int len,
     while(!done && i < cpcb->window_size){
       if(cpcb->send_buf[i].hdr.seqnbr == -1){ 
         bzero(payloadbuff,sizeof(payloadbuff));
-        create_pkbuf(&pkbuffer, RTLP_TYPE_DATA,cpcb->last_seq_num_sent++,msg_size,data,len); 
+        cpcb->last_seq_num_sent++;
+        create_pkbuf(&pkbuffer, RTLP_TYPE_DATA,cpcb->last_seq_num_sent,msg_size,data,len); 
         memcpy(&cpcb->send_buf[i],&pkbuffer,sizeof(struct pkbuf));
         done = 1; 
       }
@@ -318,7 +330,7 @@ int rtlp_transfer(struct rtlp_client_pcb *cpcb, void *data, int len,
       tv.tv_sec = 5;
       if(select(cpcb->sockfd+1, &readfds, NULL, NULL, &tv)>0){
         if (FD_ISSET(cpcb->sockfd, &readfds)) {
-          treat_arq(cpcb,outfile);
+          treat_arq(cpcb,output);
         }
         /* clear the set ahead of time */
         FD_ZERO(&readfds);
@@ -347,7 +359,8 @@ int rtlp_transfer(struct rtlp_client_pcb *cpcb, void *data, int len,
       }
     }
   }
-
+  
+  fclose(output);
 
   return 0;
 }
@@ -426,7 +439,7 @@ int rtlp_close(struct rtlp_client_pcb *cpcb)
   return -1;
 }
 
-int treat_arq(struct rtlp_client_pcb *cpcb, char *outfile) {
+int treat_arq(struct rtlp_client_pcb *cpcb, FILE *output) {
 
   
   printf(">>>Treat arq\n");
@@ -434,27 +447,9 @@ int treat_arq(struct rtlp_client_pcb *cpcb, char *outfile) {
   int i,numRead;
   struct pkbuf pkbuffer;
   char udp_buffer[RTLP_MAX_PAYLOAD_SIZE+12];
-  FILE *output;
-  
-  printf("Buffer send state\n");
-  for(i=0;i<cpcb->window_size;i++){
-    printf("%d ",cpcb->send_buf[i].hdr.seqnbr);
-  }
 
-  printf("\nBuffer send state\n");
-  for(i=0;i<cpcb->window_size;i++){
-     printf("%d ",cpcb->send_buf[i].hdr.seqnbr);
-  }
-  printf("\n");
-
-  if(outfile == NULL){
-    printf("Out = stdout\n");
-    output = stdout;    
-  } else {
-    printf("Out = %s\n",outfile);
-    output = fopen( outfile, "a");
-  }
-
+  print_state_cpcb(cpcb);
+ 
   bzero(udp_buffer, sizeof(udp_buffer));
   if((numRead = recv(cpcb->sockfd,udp_buffer,sizeof(udp_buffer),0)) < 0)
   {
@@ -471,8 +466,8 @@ int treat_arq(struct rtlp_client_pcb *cpcb, char *outfile) {
       cpcb->last_seq_num_ack = pkbuffer.hdr.seqnbr; 
       for(i=0;i<cpcb->window_size;i++){           // We delete the acquitted message from the send_packet_buffer
         if(cpcb->send_buf[i].hdr.seqnbr <  pkbuffer.hdr.seqnbr){
-          cpcb->send_buf[i].hdr.seqnbr = -1;
           printf("Ack packet %d\n",cpcb->send_buf[i].hdr.seqnbr);
+          cpcb->send_buf[i].hdr.seqnbr = -1;
         }
       }
     }
@@ -481,8 +476,11 @@ int treat_arq(struct rtlp_client_pcb *cpcb, char *outfile) {
 
   else if ( pkbuffer.hdr.type == RTLP_TYPE_DATA ) {  // If the received message is data 
     printf("Packet type DATA\n");
-    i = pkbuffer.hdr.seqnbr - cpcb->last_seq_num_sent; 
-    if( ( i < cpcb->window_size )  && (cpcb->recv_buf[i].hdr.seqnbr != -1)){
+    i = pkbuffer.hdr.seqnbr - (cpcb->last_seq_num_ack+1); 
+    printf("Place in the buffer : %d\n",i);
+    printf("Seqnbr of packet i : %d\n",cpcb->recv_buf[i].hdr.seqnbr);
+    if( (i >-1) && ( i < cpcb->window_size )  && (cpcb->recv_buf[i].hdr.seqnbr == -1)){
+      printf("Packet put in the buffer slot %d\n",i);
       memcpy(&cpcb->recv_buf[i],&pkbuffer,sizeof(struct pkbuf));
     }
     else{         // Erreur pas de place dans le buffer
@@ -491,11 +489,13 @@ int treat_arq(struct rtlp_client_pcb *cpcb, char *outfile) {
 
     i=0;
     while(cpcb->recv_buf[i].hdr.seqnbr != -1 && i<cpcb->window_size+1){
-      fwrite(cpcb->recv_buf[i].payload,sizeof(char),cpcb->recv_buf[i].len,output);
+      write_to_output(&cpcb->recv_buf[i],output); 
+      cpcb->recv_buf[i].hdr.seqnbr = -1;
       i++;
     }
-    if(i>0 && cpcb->recv_buf[i-1].hdr.seqnbr>= cpcb->last_seq_num_sent){
-      cpcb->last_seq_num_sent = cpcb->recv_buf[i-1].hdr.seqnbr+1;
+    if(i>0){
+      cpcb->last_seq_num_ack =  cpcb->last_seq_num_ack + (i+1) ;
+      cpcb->last_seq_num_sent = cpcb->last_seq_num_ack +1;
       create_pkbuf(&pkbuffer,RTLP_TYPE_ACK,cpcb->last_seq_num_sent,0,NULL,0);
       send_packet(&pkbuffer,cpcb->sockfd,cpcb->serv_addr);
     }
@@ -541,3 +541,39 @@ int sort_buff(struct pkbuf* pkarray, int len){
 }
 
 */
+
+void print_state_cpcb(struct rtlp_client_pcb *cpcb){
+  int i;
+
+  printf("=================CPCB state===================\n");
+
+  printf("Window size : %d\n",cpcb->window_size);
+
+  printf("Last seq nbr ack : %d\n",cpcb->last_seq_num_ack);
+  printf("Last seq nbr sent : %d\n",cpcb->last_seq_num_sent);
+  
+  printf("Buffer send state\n");
+  for(i=0;i<cpcb->window_size;i++){
+    printf("%d ",cpcb->send_buf[i].hdr.seqnbr);
+  }
+
+  printf("\nBuffer recv state\n");
+  for(i=0;i<cpcb->window_size;i++){
+     printf("%d ",cpcb->recv_buf[i].hdr.seqnbr);
+  }
+  printf("\n");
+
+  printf("=================CPCB state===================\n");
+}
+
+void write_to_output(struct pkbuf* buffer, FILE *output){
+  
+  if(output == NULL){
+    printf("%s",buffer->payload);
+  }
+  else {
+    printf("Writing in the file %d bytes",buffer->len);
+    fwrite(buffer->payload,sizeof(char),buffer->len,output);
+  }
+
+}

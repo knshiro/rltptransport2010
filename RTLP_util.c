@@ -11,6 +11,7 @@ struct pkbuf* create_pkbuf(struct pkbuf* buff, int type,int seqnbr,int msg_size,
 	hdr.seqnbr = seqnbr;
 	hdr.total_msg_size = msg_size;
 
+  bzero(buff->payload, RTLP_MAX_PAYLOAD_SIZE);
 
   if(payload != NULL){
 		if (len > RTLP_MAX_PAYLOAD_SIZE){
@@ -60,7 +61,7 @@ int send_packet(struct pkbuf* packet, int sockfd, struct sockaddr_in serv_addr){
   }
   char rtlp_packet[RTLP_MAX_PAYLOAD_SIZE+12];
 
-  bzero((char*)rtlp_packet, 100);
+  bzero((char*)rtlp_packet, RTLP_MAX_PAYLOAD_SIZE+12);
   memcpy(rtlp_packet,&packet->hdr.type,4);
   memcpy(rtlp_packet+4,&packet->hdr.seqnbr,4);
   memcpy(rtlp_packet+8,&packet->hdr.total_msg_size,4);
