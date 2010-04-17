@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <string.h>
 
 int main(int argc, char **argv)
 {
@@ -16,7 +17,9 @@ printf("rtlp_connect ends : %i\n",check);
 
 char *data = "SLIST";
 void *data2 = data;
-char cmd;
+char entry[100];
+char cmd[5];
+char outfile[50];
 char payloadbuff[RTLP_MAX_PAYLOAD_SIZE];
 
 /*struct pkbuf pkbuffer;
@@ -39,18 +42,53 @@ cpcb.recv_buf[2].hdr.seqnbr = 2;
 swap(cpcb.recv_buf,2,3);
 printf("Packet 2 : %d, Packet 3 : %d",cpcb.recv_buf[2].hdr.seqnbr,cpcb.recv_buf[3].hdr.seqnbr);
 */
+
 printf(">>>>1st transfert\n");
-rtlp_transfer(&cpcb,data2,5,"log");
+//rtlp_transfer(&cpcb,data2,5,NULL);
+
 
 while(1){
 
-	scanf("%c",&cmd);
-	if(cmd=='n'){
-		rtlp_transfer(&cpcb,NULL,0,"log");
+	
+	//fgets(entry,100,stdin);
+	scanf("%s",cmd);
+	printf("Cmd : %s\n",cmd);
+	if(strcmp(cmd,"r")==0){
+		rtlp_transfer(&cpcb,NULL,0,NULL);	
 	}
-	if(cmd=='q'){
+	if(strcmp(cmd,"q")==0){
 		break;
 	}
+
+	if(strcmp(cmd,"SLIST")==0){
+		rtlp_transfer(&cpcb,"SLIST",5,NULL);
+	} 
+	else if (strcmp(cmd,"CLIST")==0){
+		//rtlp_transfer(&cpcb,"SLIST",5,outfile);
+ 	}
+	else {
+		
+//		printf("%s : Sizeof %d, Strlen %d\n", entry, sizeof(entry), strlen(entry));
+		if(strcmp(cmd,"GET")==0){
+			scanf("%s",outfile);			
+			strcpy(entry,cmd);			
+			strcat(entry," ");
+			strcat(entry,outfile);
+			printf("Cmd : %s Outfile : %s, Entry: %s\n", cmd, outfile,entry);
+			rtlp_transfer(&cpcb,entry,strlen(entry),"output");
+			while(1){
+				scanf("%s",cmd);
+				if(strcmp(cmd,"r")==0){
+					rtlp_transfer(&cpcb,NULL,0,"output");	
+				}
+				if(strcmp(cmd,"q")==0){
+					break;
+				}
+			}
+			break;
+		}
+	}
+	
 }
 
 return 0;
