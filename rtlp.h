@@ -94,7 +94,8 @@ struct rtlp_server_pcb {
 	struct pkbuf send_buf[RTLP_MAX_SEND_BUF_SIZE]; 	
   	int window_size;
 	struct sockaddr_in client_addr;  /* The address of the client connected */
-	int last_seq_num_received;
+	int last_seq_num_sent;  
+	int last_seq_num_received;  //useless? laisser pour l'instant!
 };
 
 /*************************** Function Prototypes ****************************/
