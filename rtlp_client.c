@@ -8,27 +8,9 @@
 int treat_arq(struct rtlp_client_pcb *cpcb, FILE *outfile);
 void print_state_cpcb(struct rtlp_client_pcb *cpcb);
 void write_to_output(struct pkbuf* buffer, FILE *output,struct rtlp_client_pcb *cpcb);
-/*
-int compare_int (const int *a, const int *b)
-{
-  return (*a > *b) - (*a < *b);
-}
-*/
 
-int swap(struct pkbuf* pkarray,int i, int j){
 
-  int size = sizeof(pkarray);
-  struct pkbuf temp;
 
-  if (i>=size || j>=size){
-    return -1;   //TODO stderr
-  } 
-    temp = pkarray[i];
-    pkarray[i] = pkarray[j];
-    pkarray[j] = temp;
-
- return 0;
-}
 
 int rtlp_connect(struct rtlp_client_pcb *cpcb, char *dst_addr, int dst_port){
 

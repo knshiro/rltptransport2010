@@ -133,5 +133,18 @@ int create_socket(int port){
   return sockfd;
 }
 
+int swap(struct pkbuf* pkarray,int i, int j){
 
+  int size = sizeof(pkarray);
+  struct pkbuf temp;
+
+  if (i>=size || j>=size){
+    return -1;   //TODO stderr
+  } 
+    temp = pkarray[i];
+    pkarray[i] = pkarray[j];
+    pkarray[j] = temp;
+
+ return 0;
+}
 
