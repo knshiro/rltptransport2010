@@ -18,4 +18,4 @@ int create_socket(int port);
 
 static char *dup_str(const char *s);
 
-static char **get_all_files(char ** files,const char *path);
+static char **get_all_files(char ** files,const char *path,int *nb_files);
