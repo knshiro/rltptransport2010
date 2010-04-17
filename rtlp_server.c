@@ -130,14 +130,15 @@ int rtlp_transfer_loop(struct rtlp_server_pcb *spcb)
   char payloadbuff[RTLP_MAX_PAYLOAD_SIZE];
   char udp_buffer[RTLP_MAX_PAYLOAD_SIZE+12];
   char *filename=(char *)malloc(sizeof(char));
-  void* data=(void *)malloc(sizeof(void));
+  char data[RTLP_MAX_PAYLOAD_SIZE];
 
   struct sockaddr_in from;
   unsigned int fromlen;
   fromlen = sizeof(from);
 
   int len_packet;
-  int send=0;
+  int send=0; 
+  FILE * f;
 
   char * list_to_send = (char*)malloc(sizeof(char));
 
@@ -211,7 +212,8 @@ printf("Entry of the loop\n");
 				//Number of packets: here it is 1 since we dont have much to send (only the list).
 				msg_size = 1;
 				send=1;   // to enter the next loop (in order to send the list)
-				data = list_to_send;
+				memcpy(data,list_to_send,strlen(list_to_send));
+				
 				length_last_packet = strlen(list_to_send);
 				first_seq_number = pkbuffer.hdr.seqnbr+2;   //first sequence number of the file sent
 				printf("End SLIST IF\n");
@@ -225,11 +227,12 @@ printf("Entry of the loop\n");
 					filename[k]=pkbuffer.payload[k+4];
 				
 				//Get the size of the file and calculate the number of packets		 
-    				FILE * f;
     				f = fopen(filename, "rb"); 
+				
     				if (f != NULL) {
         				fseek(f, 0, SEEK_END); 
-					longlen= ftell(f);	
+					longlen= ftell(f);
+					fseek(f, 0, 0); 	
     				}
 				if(longlen%RTLP_MAX_PAYLOAD_SIZE >0){
   					msg_size = longlen/RTLP_MAX_PAYLOAD_SIZE + 1;
@@ -239,9 +242,8 @@ printf("Entry of the loop\n");
   				}
 			
 				//Put the file into void* data. We put all the file in data. It will be cut after.
-				fread(data,longlen,1,f);
 				send=1;
-				length_last_packet = longlen - (msg_size-1)*1024;
+				length_last_packet = longlen - (msg_size-1)*RTLP_MAX_PAYLOAD_SIZE;
 				first_seq_number = pkbuffer.hdr.seqnbr+2;   //first sequence number of the file sent
 			}
 			//The client wants to put a file on the server.
@@ -286,12 +288,20 @@ printf("Entry of the loop\n");
     	//Fill the packet buffer
     	while(i<msg_size && j<spcb->window_size){   
       		if(spcb->send_buf[j].hdr.seqnbr == -1){  //Check if the buffer has free space
+			bzero(data,RTLP_MAX_PAYLOAD_SIZE);
+			if(i<msg_size-1)		
+				fread(data,RTLP_MAX_PAYLOAD_SIZE,1,f);
+			else {
+				fread(data,length_last_packet,1,f);
+			}
+			printf("long: %d\n",length_last_packet);
+			printf("data: %s\n",data);
       			bzero(payloadbuff,sizeof(payloadbuff));
-        		memcpy(payloadbuff,data+i*RTLP_MAX_PAYLOAD_SIZE,RTLP_MAX_PAYLOAD_SIZE); //read MAX_PAYLOAD_SIZE and put it in the buffer
+        		//memcpy(payloadbuff,data,RTLP_MAX_PAYLOAD_SIZE); //read MAX_PAYLOAD_SIZE and put it in the buffer
 			if(i==msg_size-1){
-        		create_pkbuf(&pkbuffer, RTLP_TYPE_DATA,spcb->last_seq_num_sent + 1,msg_size,payloadbuff,length_last_packet); 
+        		create_pkbuf(&pkbuffer, RTLP_TYPE_DATA,spcb->last_seq_num_sent + 1,msg_size,data,length_last_packet); 
 			}else{
-			create_pkbuf(&pkbuffer, RTLP_TYPE_DATA,spcb->last_seq_num_sent + 1,msg_size,payloadbuff,RTLP_MAX_PAYLOAD_SIZE);
+			create_pkbuf(&pkbuffer, RTLP_TYPE_DATA,spcb->last_seq_num_sent + 1,msg_size,data,RTLP_MAX_PAYLOAD_SIZE);
 			}
         		memcpy(&spcb->send_buf[j],&pkbuffer,sizeof(struct pkbuf));      		
 			i++;
@@ -325,7 +335,7 @@ printf("Entry of the loop\n");
             			perror("Couldn't receive from socket");
           		}
           		udp_to_pkbuf(&pkbuffer, udp_buffer,len_packet);
-          		printf("PPacket of type %d received\n", pkbuffer.hdr.type );
+          		printf("Packet of type %d received\n", pkbuffer.hdr.type );
 				
          		if ( pkbuffer.hdr.type == RTLP_TYPE_ACK ) {  // If the received message is an ACK
 				for(k=0;k<spcb->window_size;k++){    // We delete the acquitted message from the send_packet_buffer
@@ -394,10 +404,6 @@ printf("Entry of the loop\n");
 		}
 	}
   repeat = repeat + 1;
-
-
-check_ack = spcb->max_ack_received-first_seq_number;
-printf("i= %i, msg_size=%i , check_ack = %i\n spcb->max_ack_received=%i,first_seq_number: %i\n  ",i,msg_size,check_ack,spcb->max_ack_received,first_seq_number);
   }  
 
 
