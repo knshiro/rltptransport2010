@@ -7,7 +7,7 @@
 
 int treat_arq(struct rtlp_client_pcb *cpcb, FILE *outfile);
 void print_state_cpcb(struct rtlp_client_pcb *cpcb);
-void write_to_output(struct pkbuf* buffer, FILE *output);
+void write_to_output(struct pkbuf* buffer, FILE *output,struct rtlp_client_pcb *cpcb);
 /*
 int compare_int (const int *a, const int *b)
 {
@@ -274,7 +274,7 @@ int rtlp_transfer(struct rtlp_client_pcb *cpcb, void *data, int len,
   printf(">>>>Transfert\n");
 
 
-  int i,msg_size,done;
+  int i,msg_size,done,sendAck;
   struct pkbuf pkbuffer;
   FILE *output = NULL;
   struct timeval tv;
@@ -310,14 +310,23 @@ int rtlp_transfer(struct rtlp_client_pcb *cpcb, void *data, int len,
   tv.tv_sec = 0;
   while(select(cpcb->sockfd+1, &readfds, NULL, NULL, &tv)>0){
     if (FD_ISSET(cpcb->sockfd, &readfds)) {
-      treat_arq(cpcb,output);
+      if(treat_arq(cpcb,output)>0){
+        sendAck = 1;
+      }
     }
     /* clear the set ahead of time */
     FD_ZERO(&readfds);
     /* add our descriptors to the set */
     FD_SET(cpcb->sockfd, &readfds);
   }
-   
+  if(sendAck == 1){
+    // ACK last ack number
+    printf("Send ack number %d\n",cpcb->last_seq_num_sent);
+    create_pkbuf(&pkbuffer,RTLP_TYPE_ACK,cpcb->last_seq_num_sent,0,NULL,0);
+    send_packet(&pkbuffer,cpcb->sockfd,cpcb->serv_addr);
+  }
+  sendAck = 0;
+
   printf("First check done\n");
 
 
@@ -344,12 +353,18 @@ int rtlp_transfer(struct rtlp_client_pcb *cpcb, void *data, int len,
       tv.tv_sec = 5;
       if(select(cpcb->sockfd+1, &readfds, NULL, NULL, &tv)>0){
         if (FD_ISSET(cpcb->sockfd, &readfds)) {
-          treat_arq(cpcb,output);
+          sendAck = treat_arq(cpcb,output);
         }
         /* clear the set ahead of time */
         FD_ZERO(&readfds);
         /* add our descriptors to the set */
         FD_SET(cpcb->sockfd, &readfds);
+        if (sendAck == 1){
+          // ACK last ack number
+          printf("Send ack number %d\n",cpcb->last_seq_num_sent);
+          create_pkbuf(&pkbuffer,RTLP_TYPE_ACK,cpcb->last_seq_num_sent,0,NULL,0);
+          send_packet(&pkbuffer,cpcb->sockfd,cpcb->serv_addr);
+        }
       }
 
       //Fill the packet buffer
@@ -367,6 +382,7 @@ int rtlp_transfer(struct rtlp_client_pcb *cpcb, void *data, int len,
     if(cpcb->send_buf[i].hdr.seqnbr != -1){
       current_time = time(0);
       if(current_time - cpcb->time_send[i] > 2){
+        printf("Timeout packet number : %d\n",cpcb->send_buf[i].hdr.seqnbr);
         send_packet(&cpcb->send_buf[i],cpcb->sockfd,cpcb->serv_addr);
         cpcb->time_send[i] = current_time;
       }
@@ -398,7 +414,7 @@ int rtlp_close(struct rtlp_client_pcb *cpcb)
 
   /* check that all the data has been received if the server is sending (size received is update everytime we receive a packet) or that the last packet has been acknowledged if the client is sending */
 
-  if((cpcb->state == 1) && ((pkbuffer->hdr.total_msg_size == cpcb->size_received) || (cpcb->last_seq_num_ack == cpcb->last_seq_num_sent +1))) {
+  if((cpcb->state == 1) && ((cpcb->total_msg_size == cpcb->size_received) || (cpcb->last_seq_num_ack == cpcb->last_seq_num_sent +1))) {
     i=0;
     while(i<3) {
       if(send_packet(pkbuffer, sockfd, cpcb->serv_addr) <0){
@@ -459,7 +475,7 @@ int treat_arq(struct rtlp_client_pcb *cpcb, FILE *output) {
   
   printf(">>>Treat arq\n");
 
-  int i,numRead;
+  int i,numRead,returnValue=0;
   struct pkbuf pkbuffer;
   char udp_buffer[RTLP_MAX_PAYLOAD_SIZE+12];
 
@@ -507,7 +523,7 @@ int treat_arq(struct rtlp_client_pcb *cpcb, FILE *output) {
 
     i=0;
     while(cpcb->recv_buf[i].hdr.seqnbr != -1 && i<cpcb->window_size+1){
-      write_to_output(&cpcb->recv_buf[i],output); 
+      write_to_output(&cpcb->recv_buf[i],output,cpcb); 
       cpcb->recv_buf[i].hdr.seqnbr = -1;
       i++;
     }
@@ -515,6 +531,7 @@ int treat_arq(struct rtlp_client_pcb *cpcb, FILE *output) {
       printf("Max i written : %d\n",i);
       cpcb->last_seq_num_ack =  cpcb->last_seq_num_ack + i ;
       cpcb->last_seq_num_sent = cpcb->last_seq_num_ack +1;
+      returnValue = 1;
     }
   }
 
@@ -525,18 +542,13 @@ int treat_arq(struct rtlp_client_pcb *cpcb, FILE *output) {
     return -1;
   }
 
-  // ACK last ack number
-  printf("Send ack number %d\n",cpcb->last_seq_num_sent);
-  create_pkbuf(&pkbuffer,RTLP_TYPE_ACK,cpcb->last_seq_num_sent,0,NULL,0);
-  send_packet(&pkbuffer,cpcb->sockfd,cpcb->serv_addr);
-
-  for(i=0;i<cpcb->window_size;i++){
+    for(i=0;i<cpcb->window_size;i++){
     if( cpcb->recv_buf[i].hdr.seqnbr != -1 ) {
       swap(cpcb->recv_buf,i,cpcb->recv_buf[i].hdr.seqnbr - (cpcb->last_seq_num_ack+1));
     }
   }
 
-  return 0;
+  return returnValue;
 }
 
 /*
@@ -565,7 +577,10 @@ void print_state_cpcb(struct rtlp_client_pcb *cpcb){
 
   printf("Last seq nbr ack : %d\n",cpcb->last_seq_num_ack);
   printf("Last seq nbr sent : %d\n",cpcb->last_seq_num_sent);
-  
+ 
+  printf("Total msg size : %d\n",cpcb->total_msg_size);
+  printf("Total received : %d\n",cpcb->size_received);
+ 
   printf("Buffer send state\n");
   for(i=0;i<cpcb->window_size;i++){
     printf("%d ",cpcb->send_buf[i].hdr.seqnbr);
@@ -588,6 +603,7 @@ void write_to_output(struct pkbuf* buffer, FILE *output, struct rtlp_client_pcb 
   else {
     printf("Writing in the file %d bytes\n",buffer->len);
     cpcb->size_received++;
+    cpcb->total_msg_size = buffer->hdr.total_msg_size;
     fwrite(buffer->payload,sizeof(char),buffer->len,output);
   }
 

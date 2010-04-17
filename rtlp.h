@@ -81,6 +81,7 @@ struct rtlp_client_pcb {
   int last_seq_num_ack; /* last sequence number received */
   int last_seq_num_sent; /* last sequence number received */
   time_t time_send[RTLP_MAX_SEND_BUF_SIZE];
+  int total_msg_size;
 
 
 };
