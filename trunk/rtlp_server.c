@@ -147,6 +147,7 @@ int rtlp_transfer_loop(struct rtlp_server_pcb *spcb)
   int nb_acks=0;
   int check_reception=1;
   int length_last_packet;
+  int check_ack;
 
 while(1) {
   //First, we check if the client asked for something and at the end if it sends a FIN packet.
@@ -240,6 +241,7 @@ while(1) {
 				fread(data,longlen,1,f);
 				send=1;
 				length_last_packet = longlen - (msg_size-1)*1024;
+				first_seq_number = pkbuffer.hdr.seqnbr+2;   //first sequence number of the file sent
 			}
 			//The client wants to put a file on the server.
 			else if(pkbuffer.payload[0] == 'P' && pkbuffer.payload[1] == 'U' && pkbuffer.payload[2] == 'T') {
@@ -274,10 +276,10 @@ while(1) {
   	spcb->send_buf[j].hdr.seqnbr = -1;
   }
 
-  i=0;
+
+  spcb->max_ack_received=0;
   //Process to send the WHOLE file and handle the acks.
-  //while(i<msg_size && j>0 && send==1){
-    while(i<msg_size && send==1){
+  while( check_ack!=msg_size && send==1){
   	j=0;  
     	//Fill the packet buffer
     	while(i<msg_size && j<spcb->window_size){   
@@ -305,7 +307,6 @@ while(1) {
 	}
 
 	//handle ACKs
-  	//while(j>0){  
 		tv.tv_sec = 5;
  		//clear the set ahead of time
 	    	FD_ZERO(&readfds);
@@ -313,7 +314,7 @@ while(1) {
 	    	FD_SET(spcb->sockfd, &readfds);
 
 		//If there are already ACKs.
-		if(select(spcb->sockfd+1, &readfds, NULL, NULL, 0)>0) {
+		while(select(spcb->sockfd+1, &readfds, NULL, NULL, &tv)>0) {
 			
 			if (FD_ISSET(spcb->sockfd, &readfds)) {
           			
@@ -325,11 +326,14 @@ while(1) {
           			printf("Packet of type %d received\n", pkbuffer.hdr.type );
 				
          			if ( pkbuffer.hdr.type == RTLP_TYPE_ACK ) {  // If the received message is an ACK
-					for(k=0;k<spcb->window_size;k++){           // We delete the acquitted message from the send_packet_buffer
+					for(k=0;k<spcb->window_size;k++){    // We delete the acquitted message from the send_packet_buffer
               					if(spcb->send_buf[k].hdr.seqnbr <  pkbuffer.hdr.seqnbr){  
                 					j--;
                 					nb_timeout = 0;
                 					spcb->send_buf[k].hdr.seqnbr = -1;
+							if(pkbuffer.hdr.seqnbr>spcb->max_ack_received)
+								spcb->max_ack_received=pkbuffer.hdr.seqnbr;
+							printf("pkbuffer.hdr.seqnbr: %i\n",pkbuffer.hdr.seqnbr);
               					}
             				}
           			} 
@@ -368,6 +372,8 @@ while(1) {
                 					j--;
                 					nb_timeout = 0;
                 					spcb->send_buf[k].hdr.seqnbr = -1;
+							if(pkbuffer.hdr.seqnbr>spcb->max_ack_received)
+								spcb->max_ack_received=pkbuffer.hdr.seqnbr;
               						}
             					}
 					jump_select=0;
@@ -384,9 +390,8 @@ while(1) {
 			}
 
 		}
-printf("i= %i, msg_size=%i , j = %i, send= %i\n",i,msg_size,j,send);
-
-      	//} 
+check_ack = spcb->max_ack_received-first_seq_number;
+printf("i= %i, msg_size=%i , check_ack = %i\n spcb->max_ack_received=%i,first_seq_number\n  ",i,msg_size,check_ack,spcb->max_ack_received,first_seq_number);
   }  
 
   //The client sends a file to the server
