@@ -150,6 +150,7 @@ int rtlp_transfer_loop(struct rtlp_server_pcb *spcb)
   int check_ack;
 
 while(1) {
+printf("Entry of the loop\n");
   //First, we check if the client asked for something and at the end if it sends a FIN packet.
   /* clear the set ahead of time */
   FD_ZERO(&readfds);
@@ -212,6 +213,7 @@ while(1) {
 				send=1;   // to enter the next loop (in order to send the list)
 				data = list_to_send;
 				length_last_packet = strlen(list_to_send);
+				first_seq_number = pkbuffer.hdr.seqnbr+2;   //first sequence number of the file sent
 				printf("End SLIST IF\n");
 			}
 			//The client requests a file (GET)
@@ -276,9 +278,10 @@ while(1) {
   }
 
   i=0;
+  int repeat = 0;
   spcb->max_ack_received=0;
   //Process to send the WHOLE file and handle the acks.
-  while( check_ack!=msg_size && send==1){
+  while( check_ack!=msg_size && send==1 ){
   	j=0;  
     	//Fill the packet buffer
     	while(i<msg_size && j<spcb->window_size){   
@@ -307,35 +310,77 @@ while(1) {
 
 	//handle ACKs
 		
- 		//clear the set ahead of time
+ 	//clear the set ahead of time
+	FD_ZERO(&readfds);
+	// add our descriptors to the set 
+	FD_SET(spcb->sockfd, &readfds);
+
+	tv.tv_sec = 3;
+	//If there are already ACKs.
+	while(select(spcb->sockfd+1, &readfds, NULL, NULL, &tv)>0) {
+		if (FD_ISSET(spcb->sockfd, &readfds)) {
+          			
+          		bzero(udp_buffer, sizeof(udp_buffer));
+          		if((len_packet=recv(spcb->sockfd,udp_buffer,sizeof(udp_buffer),0)) < 0) {
+            			perror("Couldn't receive from socket");
+          		}
+          		udp_to_pkbuf(&pkbuffer, udp_buffer,len_packet);
+          		printf("PPacket of type %d received\n", pkbuffer.hdr.type );
+				
+         		if ( pkbuffer.hdr.type == RTLP_TYPE_ACK ) {  // If the received message is an ACK
+				for(k=0;k<spcb->window_size;k++){    // We delete the acquitted message from the send_packet_buffer
+              				if(spcb->send_buf[k].hdr.seqnbr <  pkbuffer.hdr.seqnbr){  
+                				j--;
+                				nb_timeout = 0;
+                				spcb->send_buf[k].hdr.seqnbr = -1;
+						if(pkbuffer.hdr.seqnbr>spcb->max_ack_received)
+							spcb->max_ack_received=pkbuffer.hdr.seqnbr;
+						printf("pkbuffer.hdr.seqnbr: %i\n",pkbuffer.hdr.seqnbr);
+						repeat=-1;
+              				}
+            			}
+          		} 
+          		else if ( pkbuffer.hdr.type == RTLP_TYPE_DATA ) {
+				//ERROR?!
+          		}
+          		else {
+            			rtlp_server_reset(spcb);
+            			printf("Server misbehaviour\n");
+            			return -1;
+          		}
+		}
+		jump_select = 1;
+
+		//clear the set ahead of time
 	    	FD_ZERO(&readfds);
 	    	// add our descriptors to the set 
-	    	FD_SET(spcb->sockfd, &readfds);
-		printf("dfdfgh\n");
-		tv.tv_sec = 0;
-		//If there are already ACKs.
-		while(select(spcb->sockfd+1, &readfds, NULL, NULL, &tv)>0) {
-			
+	    	FD_SET(spcb->sockfd, &readfds);	
+        }
+		
+	tv.tv_sec = 3;
+	//If there were not already ACKs, we wait for some.
+	if(jump_select!=1) {
+		if(select(spcb->sockfd+1, &readfds, NULL, NULL, &tv)>0) {
 			if (FD_ISSET(spcb->sockfd, &readfds)) {
-          			
+          
           			bzero(udp_buffer, sizeof(udp_buffer));
           			if((len_packet=recv(spcb->sockfd,udp_buffer,sizeof(udp_buffer),0)) < 0) {
             				perror("Couldn't receive from socket");
           			}
           			udp_to_pkbuf(&pkbuffer, udp_buffer,len_packet);
-          			printf("Packet of type %d received\n", pkbuffer.hdr.type );
-				
+          			printf("dPacket of type %d received\n", pkbuffer.hdr.type );
+
          			if ( pkbuffer.hdr.type == RTLP_TYPE_ACK ) {  // If the received message is an ACK
-					for(k=0;k<spcb->window_size;k++){    // We delete the acquitted message from the send_packet_buffer
-              					if(spcb->send_buf[k].hdr.seqnbr <  pkbuffer.hdr.seqnbr){  
-                					j--;
-                					nb_timeout = 0;
-                					spcb->send_buf[k].hdr.seqnbr = -1;
-							if(pkbuffer.hdr.seqnbr>spcb->max_ack_received)
-								spcb->max_ack_received=pkbuffer.hdr.seqnbr;
-							printf("pkbuffer.hdr.seqnbr: %i\n",pkbuffer.hdr.seqnbr);
+            				for(k=0;k<spcb->window_size;k++){           // We delete the acquitted message from the send_packet_buffer
+              					if(spcb->send_buf[k].hdr.seqnbr <  pkbuffer.hdr.seqnbr){   
+                				j--;
+                				nb_timeout = 0;
+                				spcb->send_buf[k].hdr.seqnbr = -1;
+						if(pkbuffer.hdr.seqnbr>spcb->max_ack_received)
+							spcb->max_ack_received=pkbuffer.hdr.seqnbr;
               					}
             				}
+				jump_select=0;
           			} 
           			else if ( pkbuffer.hdr.type == RTLP_TYPE_DATA ) {
 				//ERROR?!
@@ -346,58 +391,17 @@ while(1) {
             				return -1;
           			}
 			}
-			jump_select = 1;
-
-			//clear the set ahead of time
-	    		FD_ZERO(&readfds);
-	    		// add our descriptors to the set 
-	    		FD_SET(spcb->sockfd, &readfds);
-		
-        	}
-		
-
-		printf("select2\n");
-		tv.tv_sec = 1;
-		//If there were not already ACKs, we wait for some.
-		if(jump_select!=1) {
-			if(select(spcb->sockfd+1, &readfds, NULL, NULL, &tv)>0) {
-				if (FD_ISSET(spcb->sockfd, &readfds)) {
-          
-          				bzero(udp_buffer, sizeof(udp_buffer));
-          				if((len_packet=recv(spcb->sockfd,udp_buffer,sizeof(udp_buffer),0)) < 0) {
-            					perror("Couldn't receive from socket");
-          				}
-          				udp_to_pkbuf(&pkbuffer, udp_buffer,len_packet);
-          				printf("Packet of type %d received\n", pkbuffer.hdr.type );
-
-         				if ( pkbuffer.hdr.type == RTLP_TYPE_ACK ) {  // If the received message is an ACK
-            					for(k=0;k<spcb->window_size;k++){           // We delete the acquitted message from the send_packet_buffer
-              						if(spcb->send_buf[k].hdr.seqnbr <  pkbuffer.hdr.seqnbr){   
-                					j--;
-                					nb_timeout = 0;
-                					spcb->send_buf[k].hdr.seqnbr = -1;
-							if(pkbuffer.hdr.seqnbr>spcb->max_ack_received)
-								spcb->max_ack_received=pkbuffer.hdr.seqnbr;
-              						}
-            					}
-					jump_select=0;
-          				} 
-          				else if ( pkbuffer.hdr.type == RTLP_TYPE_DATA ) {
-					//ERROR?!
-          				}
-          				else {
-            				rtlp_server_reset(spcb);
-            				printf("Server misbehaviour\n");
-            				return -1;
-          				}
-				}
-			}
-			printf("select\n");
-
 		}
+	}
+  repeat = repeat + 1;
+
+
 check_ack = spcb->max_ack_received-first_seq_number;
-printf("i= %i, msg_size=%i , check_ack = %i\n spcb->max_ack_received=%i,first_seq_number\n  ",i,msg_size,check_ack,spcb->max_ack_received,first_seq_number);
+printf("i= %i, msg_size=%i , check_ack = %i\n spcb->max_ack_received=%i,first_seq_number: %i\n  ",i,msg_size,check_ack,spcb->max_ack_received,first_seq_number);
   }  
+
+
+
 
   //The client sends a file to the server
 while(send==2){
@@ -428,7 +432,7 @@ while(send==2){
           		perror("Couldn't receive from socket");
 		}
         	udp_to_pkbuf(&pkbuffer, udp_buffer,len_packet);
-        	printf("Packet of type %d received\n", pkbuffer.hdr.type);
+        	printf("ePacket of type %d received\n", pkbuffer.hdr.type);
         	if (pkbuffer.hdr.type == RTLP_TYPE_DATA) {
 			msg_size  = pkbuffer.hdr.total_msg_size;
 			u = pkbuffer.hdr.seqnbr - spcb->last_seq_num_received;
