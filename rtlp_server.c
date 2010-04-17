@@ -225,7 +225,6 @@ while(1) {
 				//Get the size of the file and calculate the number of packets		 
     				FILE * f;
     				f = fopen(filename, "rb"); 
-				//printf("file: %s\n",filename);  
     				if (f != NULL) {
         				fseek(f, 0, SEEK_END); 
 					longlen= ftell(f);	
@@ -276,7 +275,7 @@ while(1) {
   	spcb->send_buf[j].hdr.seqnbr = -1;
   }
 
-
+  i=0;
   spcb->max_ack_received=0;
   //Process to send the WHOLE file and handle the acks.
   while( check_ack!=msg_size && send==1){
@@ -307,12 +306,13 @@ while(1) {
 	}
 
 	//handle ACKs
-		tv.tv_sec = 5;
+		
  		//clear the set ahead of time
 	    	FD_ZERO(&readfds);
 	    	// add our descriptors to the set 
 	    	FD_SET(spcb->sockfd, &readfds);
-
+		printf("dfdfgh\n");
+		tv.tv_sec = 0;
 		//If there are already ACKs.
 		while(select(spcb->sockfd+1, &readfds, NULL, NULL, &tv)>0) {
 			
@@ -352,8 +352,12 @@ while(1) {
 	    		FD_ZERO(&readfds);
 	    		// add our descriptors to the set 
 	    		FD_SET(spcb->sockfd, &readfds);
+		
         	}
+		
 
+		printf("select2\n");
+		tv.tv_sec = 1;
 		//If there were not already ACKs, we wait for some.
 		if(jump_select!=1) {
 			if(select(spcb->sockfd+1, &readfds, NULL, NULL, &tv)>0) {
@@ -388,6 +392,7 @@ while(1) {
           				}
 				}
 			}
+			printf("select\n");
 
 		}
 check_ack = spcb->max_ack_received-first_seq_number;
