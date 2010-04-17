@@ -22,6 +22,7 @@
 #include <sys/types.h>
 #include <netinet/in.h>
 #include <netdb.h>
+#include <time.h>
 
 
 /*************************** RTLP Packet Types
@@ -73,11 +74,15 @@ struct rtlp_client_pcb {
 	struct pkbuf send_buf[RTLP_MAX_SEND_BUF_SIZE]; 		
 
 	/* Your extensions here */
-   struct sockaddr_in serv_addr;  /* The address of the server connected */
-   int window_size;  /* Window size chosen by the application, must be < RTLP_MAX_SEND_BUF_SIZE*/
-   int size_received; /* Total size of the data received so far */
-   int last_seq_num_received; /* last sequence number received */
-   int last_seq_num_sent; /* last sequence number received */
+	struct pkbuf recv_buf[RTLP_MAX_SEND_BUF_SIZE]; 		
+  struct sockaddr_in serv_addr;  /* The address of the server connected */
+  int window_size;  /* Window size chosen by the application, must be < RTLP_MAX_SEND_BUF_SIZE*/
+  int size_received; /* Total size of the data received so far */
+  int last_seq_num_recv; /* last sequence number received */
+  int last_seq_num_sent; /* last sequence number received */
+  time_t time_send[RTLP_MAX_SEND_BUF_SIZE];
+
+
 };
 
 /* Server PCB */
@@ -89,6 +94,7 @@ struct rtlp_server_pcb {
 	struct pkbuf send_buf[RTLP_MAX_SEND_BUF_SIZE]; 	
   	int window_size;
 	struct sockaddr_in client_addr;  /* The address of the client connected */
+	int last_seq_num_received;
 };
 
 /*************************** Function Prototypes ****************************/

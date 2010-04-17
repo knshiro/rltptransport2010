@@ -1,5 +1,5 @@
 LIBS =
-CC = gcc -Wall -g
+CC = gcc -Wall -g -std=gnu99
 
 all:   client server 
 
