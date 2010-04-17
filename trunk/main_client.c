@@ -39,7 +39,7 @@ return 0;
 
 int rtlp_test(struct rtlp_client_pcb *cpcb){
  
-int sockfd,i,srv;
+int sockfd,i,srv,numRead;
 sockfd=cpcb->sockfd;
 struct pkbuf *pkbuffer;
 pkbuffer = (struct pkbuf*)malloc(sizeof(struct pkbuf));
@@ -59,12 +59,12 @@ if (srv == -1) {
 	// one or both of the descriptors have data
 	if (FD_ISSET(sockfd, &readfds)) {
 		bzero(rtlp_packet, sizeof(rtlp_packet));
-        	if(recv(sockfd,rtlp_packet,sizeof(rtlp_packet),0) < 0)
+        	if(numRead = recv(sockfd,rtlp_packet,sizeof(rtlp_packet),0) < 0)
 		{
 		      perror("Couldnt' receive from socket");
 		}
 
-        	udp_to_pkbuf(pkbuffer, rtlp_packet);
+        	udp_to_pkbuf(pkbuffer, rtlp_packet, numRead);
         	printf("PPPPacket of type %d received\n", pkbuffer->hdr.type );
         	if ( pkbuffer->hdr.type == RTLP_TYPE_DATA ) {
           		printf("Received Data\n");
