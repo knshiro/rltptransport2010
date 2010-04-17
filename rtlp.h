@@ -96,6 +96,7 @@ struct rtlp_server_pcb {
 	struct sockaddr_in client_addr;  /* The address of the client connected */
 	int last_seq_num_sent;  
 	int last_seq_num_received;  //useless? laisser pour l'instant!
+	int max_ack_received;
 };
 
 /*************************** Function Prototypes ****************************/
