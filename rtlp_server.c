@@ -89,7 +89,7 @@ int rtlp_accept(struct rtlp_server_pcb *spcb){
 	//create pkbuf and send packet
   			create_pkbuf(&pkbuffer, RTLP_TYPE_ACK, 1,0, NULL,0);
   			if((out_loop = send_packet(&pkbuffer, spcb->sockfd, from)) < 0){
-				printf("probleme: cannot send packet\n");
+				printf("Problem: cannot send packet\n");
 				exit(-1);
 	 		 }
 			spcb->last_seq_num_sent = 1;
@@ -146,6 +146,7 @@ int rtlp_transfer_loop(struct rtlp_server_pcb *spcb)
   int first_seq_number;
   int nb_acks=0;
   int check_reception=1;
+  int length_last_packet;
 
 while(1) {
   //First, we check if the client asked for something and at the end if it sends a FIN packet.
@@ -173,15 +174,13 @@ while(1) {
 
 		//Send an ACK
 		create_pkbuf(&pkbuffer, RTLP_TYPE_ACK,spcb->last_seq_num_sent+1,0, NULL,0);
-  		printf("Packet ACK created\n");
+  		printf("1st packet ACK created\n");
   		if(send_packet(&pkbuffer, spcb->sockfd, from) <0){
     			return -1;
   		}
 		spcb->last_seq_num_sent = spcb->last_seq_num_sent +1;
 		udp_to_pkbuf(&pkbuffer, udp_buffer,len_packet);
-        	if (pkbuffer.hdr.type == RTLP_TYPE_DATA) {
-						
-			printf("pkbuffer.payload: %s\n",pkbuffer.payload);
+        	if (pkbuffer.hdr.type == RTLP_TYPE_DATA) {		
 
 			//Read the data to know what the client asked for
 			//The client wants the list of the files
@@ -211,6 +210,7 @@ while(1) {
 				msg_size = 1;
 				send=1;   // to enter the next loop (in order to send the list)
 				data = list_to_send;
+				length_last_packet = strlen(list_to_send);
 				printf("End SLIST IF\n");
 			}
 			//The client requests a file (GET)
@@ -223,7 +223,8 @@ while(1) {
 				
 				//Get the size of the file and calculate the number of packets		 
     				FILE * f;
-    				f = fopen(filename, "rb");   
+    				f = fopen(filename, "rb"); 
+				//printf("file: %s\n",filename);  
     				if (f != NULL) {
         				fseek(f, 0, SEEK_END); 
 					longlen= ftell(f);	
@@ -238,6 +239,7 @@ while(1) {
 				//Put the file into void* data. We put all the file in data. It will be cut after.
 				fread(data,longlen,1,f);
 				send=1;
+				length_last_packet = longlen - (msg_size-1)*1024;
 			}
 			//The client wants to put a file on the server.
 			else if(pkbuffer.payload[0] == 'P' && pkbuffer.payload[1] == 'U' && pkbuffer.payload[2] == 'T') {
@@ -274,15 +276,19 @@ while(1) {
 
   i=0;
   //Process to send the WHOLE file and handle the acks.
-  while(i<msg_size && j>0 && send==1){
+  //while(i<msg_size && j>0 && send==1){
+    while(i<msg_size && send==1){
   	j=0;  
     	//Fill the packet buffer
     	while(i<msg_size && j<spcb->window_size){   
       		if(spcb->send_buf[j].hdr.seqnbr == -1){  //Check if the buffer has free space
-			printf("j= %i\n",j);
       			bzero(payloadbuff,sizeof(payloadbuff));
         		memcpy(payloadbuff,data+i*RTLP_MAX_PAYLOAD_SIZE,RTLP_MAX_PAYLOAD_SIZE); //read MAX_PAYLOAD_SIZE and put it in the buffer
-        		create_pkbuf(&pkbuffer, RTLP_TYPE_DATA,spcb->last_seq_num_sent + 1,msg_size,payloadbuff,RTLP_MAX_PAYLOAD_SIZE); 
+			if(i==msg_size-1){
+        		create_pkbuf(&pkbuffer, RTLP_TYPE_DATA,spcb->last_seq_num_sent + 1,msg_size,payloadbuff,length_last_packet); 
+			}else{
+			create_pkbuf(&pkbuffer, RTLP_TYPE_DATA,spcb->last_seq_num_sent + 1,msg_size,payloadbuff,RTLP_MAX_PAYLOAD_SIZE);
+			}
         		memcpy(&spcb->send_buf[j],&pkbuffer,sizeof(struct pkbuf));      		
 			i++;
 			spcb->last_seq_num_sent = spcb->last_seq_num_sent + 1; //Increase the seq. number
@@ -307,8 +313,8 @@ while(1) {
 	    	FD_SET(spcb->sockfd, &readfds);
 
 		//If there are already ACKs.
-		while(select(spcb->sockfd+1, &readfds, NULL, NULL, 0)>0) {
-
+		if(select(spcb->sockfd+1, &readfds, NULL, NULL, 0)>0) {
+			
 			if (FD_ISSET(spcb->sockfd, &readfds)) {
           			
           			bzero(udp_buffer, sizeof(udp_buffer));
@@ -317,14 +323,13 @@ while(1) {
           			}
           			udp_to_pkbuf(&pkbuffer, udp_buffer,len_packet);
           			printf("Packet of type %d received\n", pkbuffer.hdr.type );
-
+				
          			if ( pkbuffer.hdr.type == RTLP_TYPE_ACK ) {  // If the received message is an ACK
-            				for(k=0;k<spcb->window_size;k++){           // We delete the acquitted message from the send_packet_buffer
+					for(k=0;k<spcb->window_size;k++){           // We delete the acquitted message from the send_packet_buffer
               					if(spcb->send_buf[k].hdr.seqnbr <  pkbuffer.hdr.seqnbr){  
-						
-                				j--;
-                				nb_timeout = 0;
-                				spcb->send_buf[k].hdr.seqnbr = -1;
+                					j--;
+                					nb_timeout = 0;
+                					spcb->send_buf[k].hdr.seqnbr = -1;
               					}
             				}
           			} 
@@ -344,6 +349,7 @@ while(1) {
 	    		// add our descriptors to the set 
 	    		FD_SET(spcb->sockfd, &readfds);
         	}
+
 		//If there were not already ACKs, we wait for some.
 		if(jump_select!=1) {
 			if(select(spcb->sockfd+1, &readfds, NULL, NULL, &tv)>0) {
@@ -378,7 +384,7 @@ while(1) {
 			}
 
 		}
-
+printf("i= %i, msg_size=%i , j = %i, send= %i\n",i,msg_size,j,send);
 
       	//} 
   }  
