@@ -85,7 +85,7 @@ int rtlp_connect(struct rtlp_client_pcb *cpcb, char *dst_addr, int dst_port){
       // one or both of the descriptors have data
       if (FD_ISSET(sockfd, &readfds)) {
         bzero(rtlp_packet, sizeof(rtlp_packet));
-        if(numRead = recv(sockfd,rtlp_packet,sizeof(rtlp_packet),0) < 0)
+        if((numRead = recv(sockfd,rtlp_packet,sizeof(rtlp_packet),0)) < 0)
         {
           perror("Couldnt' receive from socket");
         }
@@ -350,7 +350,7 @@ int rtlp_close(struct rtlp_client_pcb *cpcb)
 
   /* check that all the data has been received if the server is sending (size received is update everytime we receive a packet) or that the last packet has been acknowledged if the client is sending */
 
-  if(cpcb->state = 1 && ((pkbuffer->hdr.total_msg_size == cpcb->size_received) || (cpcb->last_seq_num_ack == cpcb->last_seq_num_sent +1))) {
+  if((cpcb->state == 1) && ((pkbuffer->hdr.total_msg_size == cpcb->size_received) || (cpcb->last_seq_num_ack == cpcb->last_seq_num_sent +1))) {
     i=0;
     while(i<3) {
       if(send_packet(pkbuffer, sockfd, cpcb->serv_addr) <0){
@@ -379,7 +379,7 @@ int rtlp_close(struct rtlp_client_pcb *cpcb)
         // one or both of the descriptors have data
         if (FD_ISSET(sockfd, &readfds)) {
           bzero(rtlp_packet, sizeof(rtlp_packet));
-          if(numRead = recv(sockfd,rtlp_packet,sizeof(rtlp_packet),0) < 0) {
+          if((numRead = recv(sockfd,rtlp_packet,sizeof(rtlp_packet),0)) < 0) {
             perror("Couldn't receive from socket");
           }
 
@@ -423,7 +423,7 @@ int treat_arq(struct rtlp_client_pcb *cpcb, char *outfile) {
   }
 
   bzero(udp_buffer, sizeof(udp_buffer));
-  if(numRead = recv(cpcb->sockfd,udp_buffer,sizeof(udp_buffer),0) < 0)
+  if((numRead = recv(cpcb->sockfd,udp_buffer,sizeof(udp_buffer),0)) < 0)
   {
     perror("Couldn't receive from socket"); //TODO stderr 
   }
