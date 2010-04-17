@@ -98,7 +98,7 @@ struct pkbuf* udp_to_pkbuf(struct pkbuf* pkbuffer, char * udppacket, int len){
   memcpy(&total_msg_size,udppacket+8,4);
   payload= udppacket+12;
   
-  return create_pkbuf(pkbuffer,type,seqnbr,total_msg_size,payload,len);
+  return create_pkbuf(pkbuffer,type,seqnbr,total_msg_size,payload,len-12);
 
 }
 
