@@ -17,7 +17,7 @@ int rtlp_connect(struct rtlp_client_pcb *cpcb, char *dst_addr, int dst_port){
 
   printf(">>> Function rtlp_connect\n");
 
-  int sockfd,i,srv;
+  int sockfd,i,srv,numRead;
   struct pkbuf pkbuffer;
   //pkbuffer = (struct pkbuf*)malloc(sizeof(struct pkbuf));
   struct timeval tv;
@@ -85,12 +85,12 @@ int rtlp_connect(struct rtlp_client_pcb *cpcb, char *dst_addr, int dst_port){
       // one or both of the descriptors have data
       if (FD_ISSET(sockfd, &readfds)) {
         bzero(rtlp_packet, sizeof(rtlp_packet));
-        if(recv(sockfd,rtlp_packet,sizeof(rtlp_packet),0) < 0)
+        if(numRead = recv(sockfd,rtlp_packet,sizeof(rtlp_packet),0) < 0)
         {
           perror("Couldnt' receive from socket");
         }
 
-        udp_to_pkbuf(&pkbuffer, rtlp_packet);
+        udp_to_pkbuf(&pkbuffer, rtlp_packet, numRead);
         printf("Packet of type %d received\n", pkbuffer.hdr.type );
         if ( pkbuffer.hdr.type == RTLP_TYPE_ACK ) {
           printf("Connection successful\n");
@@ -128,7 +128,7 @@ int rtlp_client_reset(struct rtlp_client_pcb *cpcb){
 
 }
 
-
+/*
 
 int rtlp_transfer2(struct rtlp_client_pcb *cpcb, void *data, int len,
     char* outfile){
@@ -182,9 +182,9 @@ int rtlp_transfer2(struct rtlp_client_pcb *cpcb, void *data, int len,
     }
 
     while(j>0){    
-      /* clear the set ahead of time */
+      // clear the set ahead of time 
       FD_ZERO(&readfds);
-      /* add our descriptors to the set */
+      // add our descriptors to the set 
       FD_SET(cpcb->sockfd, &readfds);
 
       tv.tv_sec = 2;
@@ -236,7 +236,7 @@ int rtlp_transfer2(struct rtlp_client_pcb *cpcb, void *data, int len,
   }
   return 0;
 }        
-
+*/
 
 int rtlp_transfer(struct rtlp_client_pcb *cpcb, void *data, int len,
     char* outfile){
@@ -338,7 +338,7 @@ int rtlp_transfer(struct rtlp_client_pcb *cpcb, void *data, int len,
 int rtlp_close(struct rtlp_client_pcb *cpcb)
 {
   printf(">>>>rtlp_close\n"); 
-  int sockfd,i,srv;
+  int sockfd,i,srv,numRead;
   sockfd=cpcb->sockfd;
   struct pkbuf *pkbuffer;
   pkbuffer = (struct pkbuf*)malloc(sizeof(struct pkbuf));
@@ -379,11 +379,11 @@ int rtlp_close(struct rtlp_client_pcb *cpcb)
         // one or both of the descriptors have data
         if (FD_ISSET(sockfd, &readfds)) {
           bzero(rtlp_packet, sizeof(rtlp_packet));
-          if(recv(sockfd,rtlp_packet,sizeof(rtlp_packet),0) < 0) {
+          if(numRead = recv(sockfd,rtlp_packet,sizeof(rtlp_packet),0) < 0) {
             perror("Couldn't receive from socket");
           }
 
-          udp_to_pkbuf(pkbuffer, rtlp_packet);
+          udp_to_pkbuf(pkbuffer, rtlp_packet, numRead);
           printf("Packet of type %d received\n", pkbuffer->hdr.type );
           if ( pkbuffer->hdr.type == RTLP_TYPE_ACK ) {
             printf("Termination successful\n");
@@ -408,7 +408,7 @@ int rtlp_close(struct rtlp_client_pcb *cpcb)
 
 int treat_arq(struct rtlp_client_pcb *cpcb, char *outfile) {
 
-  int i,done;
+  int i,done,numRead;
   struct pkbuf pkbuffer;
   char udp_buffer[RTLP_MAX_PAYLOAD_SIZE+12];
   char payloadbuff[RTLP_MAX_PAYLOAD_SIZE];
@@ -423,12 +423,12 @@ int treat_arq(struct rtlp_client_pcb *cpcb, char *outfile) {
   }
 
   bzero(udp_buffer, sizeof(udp_buffer));
-  if(recv(cpcb->sockfd,udp_buffer,sizeof(udp_buffer),0) < 0)
+  if(numRead = recv(cpcb->sockfd,udp_buffer,sizeof(udp_buffer),0) < 0)
   {
     perror("Couldn't receive from socket"); //TODO stderr 
   }
 
-  udp_to_pkbuf(&pkbuffer, udp_buffer);
+  udp_to_pkbuf(&pkbuffer, udp_buffer, numRead);
   printf("Packet seqnbr %d received\n", pkbuffer.hdr.seqnbr );
 
   if ( pkbuffer.hdr.type == RTLP_TYPE_ACK ) {  // If the received message is an ACK
