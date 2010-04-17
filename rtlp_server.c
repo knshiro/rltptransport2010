@@ -202,7 +202,7 @@ while(1) {
 				int nb_files2= *nb_files;
 				while(u<nb_files2) {  
 					strcat(list_to_send,files[u]); 
-					strcat(list_to_send," ");
+					strcat(list_to_send,"\n");
 					u++;			
 				}		
 				printf("list to send: %s\n",list_to_send);
