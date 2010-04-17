@@ -67,7 +67,7 @@ int rtlp_accept(struct rtlp_server_pcb *spcb){
       		if((numread = recvfrom(spcb->sockfd,rtlp_packet,sizeof(rtlp_packet), 0, (struct sockaddr*)&from, &fromlen)) < 0){
 	  		error("Couldnt' receive from socket");
 		}
-      		udp_to_pkbuf(&pkbuffer, rtlp_packet);
+      		udp_to_pkbuf(&pkbuffer, rtlp_packet,numread);
       		printf("Received message from port %d and address %s.\n", ntohs(from.sin_port), inet_ntoa(from.sin_addr));
       		if ( pkbuffer.hdr.type == RTLP_TYPE_SYN) {
     	 		printf("Received Packet type: %i\n",pkbuffer.hdr.type);
@@ -136,6 +136,7 @@ int rtlp_transfer_loop(struct rtlp_server_pcb *spcb)
   unsigned int fromlen;
   fromlen = sizeof(from);
 
+  int len_packet;
   int send=0;
 
   char * list_to_send = (char*)malloc(sizeof(char));
@@ -164,7 +165,7 @@ while(1) {
         if (FD_ISSET(spcb->sockfd, &readfds)) {
           
         	bzero(udp_buffer, sizeof(udp_buffer));
-		if(recvfrom(spcb->sockfd,udp_buffer, sizeof(udp_buffer), 0, (struct sockaddr*)&from, &fromlen) < 0) {
+		if(len_packet=recvfrom(spcb->sockfd,udp_buffer, sizeof(udp_buffer), 0, (struct sockaddr*)&from, &fromlen) < 0) {
           		perror("Couldn't receive from socket");
 		}
         	
@@ -177,44 +178,49 @@ while(1) {
     			return -1;
   		}
 		spcb->last_seq_num_sent = spcb->last_seq_num_sent +1;
-		udp_to_pkbuf(&pkbuffer, udp_buffer);
+		udp_to_pkbuf(&pkbuffer, udp_buffer,len_packet);
         	if (pkbuffer.hdr.type == RTLP_TYPE_DATA) {
 						
 			printf("pkbuffer.payload: %s\n",pkbuffer.payload);
+
 			//Read the data to know what the client asked for
 			//The client wants the list of the files
-			if(strcmp(pkbuffer.payload,"SLIS")==0) {	
+			if(strcmp(pkbuffer.payload,"SLIST")==0) {	
 				printf("Enter SLIST IF\n");	
 				//Read the directory
 				char **files;
 				const char *path = ".";
-				files = get_all_files(files,path);
-
+				int* nb_files=(int*)malloc(sizeof(int));
+				*nb_files=0;
+				files = get_all_files(files,path,nb_files);
+				printf("nb_files: %i\n",*nb_files);
 				if (!files) {
       					printf("Cannot read the directory\n");
        					return -1;
 				}
 				//Put the char** files into a char*
 				u=0;
-				while(u<10) {  //PROBLEME COMMENT CONNAITRE LE NOMBRE EXACT DE FICHIERS??
+				int nb_files2= *nb_files;
+				while(u<nb_files2) {  
 					strcat(list_to_send,files[u]); 
 					strcat(list_to_send," ");
 					u++;			
 				}		
-				printf("%s\n",list_to_send);
+				printf("list to send: %s\n",list_to_send);
 				//Number of packets: here it is 1 since we dont have much to send (only the list).
 				msg_size = 1;
-				send=1;   // to enter the next loop (to send)
+				send=1;   // to enter the next loop (in order to send the list)
 				data = list_to_send;
 				printf("End SLIST IF\n");
 			}
 			//The client requests a file (GET)
-			else if (pkbuffer.payload[0] == 'G' && pkbuffer.payload[1] == 'E' && pkbuffer.payload[2] == 'T') {		
+			else if (pkbuffer.payload[0] == 'G' && pkbuffer.payload[1] == 'E' && pkbuffer.payload[2] == 'T') {	
+					
 				//Get the name of the file
 				len = strlen(pkbuffer.payload);
 				for(k=0;k<len-4;k++)
 					filename[k]=pkbuffer.payload[k+4];
-			
+				
 				//Get the size of the file and calculate the number of packets		 
     				FILE * f;
     				f = fopen(filename, "rb");   
@@ -302,12 +308,12 @@ while(1) {
 		//If there are already ACKs.
 		while(select(spcb->sockfd+1, &readfds, NULL, NULL, 0)>0) {
 			if (FD_ISSET(spcb->sockfd, &readfds)) {
-          
+          			
           			bzero(udp_buffer, sizeof(udp_buffer));
-          			if(recv(spcb->sockfd,udp_buffer,sizeof(udp_buffer),0) < 0) {
+          			if(len_packet=recv(spcb->sockfd,udp_buffer,sizeof(udp_buffer),0) < 0) {
             				perror("Couldn't receive from socket");
           			}
-          			udp_to_pkbuf(&pkbuffer, udp_buffer);
+          			udp_to_pkbuf(&pkbuffer, udp_buffer,len_packet);
           			printf("Packet of type %d received\n", pkbuffer.hdr.type );
 
          			if ( pkbuffer.hdr.type == RTLP_TYPE_ACK ) {  // If the received message is an ACK
@@ -336,10 +342,10 @@ while(1) {
 				if (FD_ISSET(spcb->sockfd, &readfds)) {
           
           				bzero(udp_buffer, sizeof(udp_buffer));
-          				if(recv(spcb->sockfd,udp_buffer,sizeof(udp_buffer),0) < 0) {
+          				if(len_packet=recv(spcb->sockfd,udp_buffer,sizeof(udp_buffer),0) < 0) {
             					perror("Couldn't receive from socket");
           				}
-          				udp_to_pkbuf(&pkbuffer, udp_buffer);
+          				udp_to_pkbuf(&pkbuffer, udp_buffer,len_packet);
           				printf("Packet of type %d received\n", pkbuffer.hdr.type );
 
          				if ( pkbuffer.hdr.type == RTLP_TYPE_ACK ) {  // If the received message is an ACK
@@ -394,10 +400,10 @@ while(send==2){
         if (FD_ISSET(spcb->sockfd, &readfds)) {
           
         	bzero(udp_buffer, sizeof(udp_buffer));
-		if(recvfrom(spcb->sockfd,udp_buffer,sizeof(udp_buffer), 0, (struct sockaddr*)&from, &fromlen) < 0) {
+		if(len_packet=recvfrom(spcb->sockfd,udp_buffer,sizeof(udp_buffer), 0, (struct sockaddr*)&from, &fromlen) < 0) {
           		perror("Couldn't receive from socket");
 		}
-        	udp_to_pkbuf(&pkbuffer, udp_buffer);
+        	udp_to_pkbuf(&pkbuffer, udp_buffer,len_packet);
         	printf("Packet of type %d received\n", pkbuffer.hdr.type);
         	if (pkbuffer.hdr.type == RTLP_TYPE_DATA) {
 			msg_size  = pkbuffer.hdr.total_msg_size;
@@ -439,10 +445,10 @@ while(send==2){
        		// one or both of the descriptors have data
         	if (FD_ISSET(spcb->sockfd, &readfds)) {
         		bzero(udp_buffer, sizeof(udp_buffer));
-			if(recvfrom(spcb->sockfd,udp_buffer,sizeof(udp_buffer), 0, (struct sockaddr*)&from, &fromlen) < 0) {
+			if(len_packet=recvfrom(spcb->sockfd,udp_buffer,sizeof(udp_buffer), 0, (struct sockaddr*)&from, &fromlen) < 0) {
           			perror("Couldn't receive from socket");
 			}
-        		udp_to_pkbuf(&pkbuffer, udp_buffer);
+        		udp_to_pkbuf(&pkbuffer, udp_buffer,len_packet);
         		printf("Packet of type %d received\n", pkbuffer.hdr.type);
         		if (pkbuffer.hdr.type == RTLP_TYPE_DATA) {
 				u = pkbuffer.hdr.seqnbr - first_seq_number - nb_acks;
@@ -509,7 +515,7 @@ static char *dup_str(const char *s) {
     return t;
 }
  
-static char **get_all_files(char** files, const char *path) {
+static char **get_all_files(char** files, const char *path, int *i) {
     DIR *dir;
     struct dirent *dp;
     //char **files;
@@ -539,6 +545,7 @@ static char **get_all_files(char** files, const char *path) {
             goto error_free;
         }
         ++used;
+	*i= *i +1;
     }
  
     files[used] = NULL;
