@@ -9,20 +9,22 @@
 
 int main(int argc, char **argv)
 {
-struct rtlp_client_pcb *cpcb = (struct rtlp_client_pcb *)malloc(sizeof(struct rtlp_client_pcb));
+struct rtlp_client_pcb cpcb;
 char *dst_addr= "127.0.0.1";
-int check = rtlp_connect(cpcb, dst_addr,4500);
+int check = rtlp_connect(&cpcb, dst_addr,4500);
 printf("rtlp_connect ends : %i\n",check);
 
 char *data = "SLIST";
 void *data2 = data;
+char cmd;
 char payloadbuff[RTLP_MAX_PAYLOAD_SIZE];
 
-struct pkbuf pkbuffer;
+/*struct pkbuf pkbuffer;
 bzero(payloadbuff,sizeof(payloadbuff));
 memcpy(payloadbuff,data2,RTLP_MAX_PAYLOAD_SIZE);
 create_pkbuf(&pkbuffer, RTLP_TYPE_DATA,3,1,payloadbuff,RTLP_MAX_PAYLOAD_SIZE);
 printf("data envoyé: %s\n",pkbuffer.payload);
+
 if(send_packet(&pkbuffer, cpcb->sockfd, cpcb->serv_addr) <0){
 	exit(-1);
 }
@@ -31,6 +33,18 @@ check = rtlp_test(cpcb);
 int check2 = rtlp_close(cpcb);
 printf("rtlp_close ends: %i\n",check2);
 */
+printf(">>>>1st transfert\n");
+rtlp_transfer(&cpcb,data2,5,NULL);
+while(1){
+
+scanf("%c",&cmd);
+if(cmd=='n'){
+  rtlp_transfer(&cpcb,NULL,0,NULL);
+}
+
+
+}
+
 return 0;
 }
 

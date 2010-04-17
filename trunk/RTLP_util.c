@@ -90,8 +90,6 @@ struct pkbuf* udp_to_pkbuf(struct pkbuf* pkbuffer, char * udppacket, int len){
   char * payload;
  
   printf("Packet udp size: %d\n",  sizeof(udppacket));
-  printf("Packet char size: %d\n",  sizeof(char));
-  printf("Packet int size: %d\n",  sizeof(int));
 
   memcpy(&type,udppacket,4);
   memcpy(&seqnbr,udppacket+4,4);
