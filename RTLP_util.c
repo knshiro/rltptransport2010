@@ -4,6 +4,7 @@ struct pkbuf* create_pkbuf(struct pkbuf* buff, int type,int seqnbr,int msg_size,
 
   printf(">create_pkbuf\n");
 
+		  printf("Len %d\n",len);
 	struct rtlp_hdr hdr;
 
 	hdr.type = type;
@@ -52,6 +53,8 @@ int send_packet(struct pkbuf* packet, int sockfd, struct sockaddr_in serv_addr){
   printf("Packet Buff type: %d\n",packet->hdr.type);
   printf("Packet Buff seqnbr: %d\n",packet->hdr.seqnbr);
   printf("Packet Buff total_msg_size: %d\n",packet->hdr.total_msg_size);
+  printf("packet buff len : %d\n",packet->len);
+  printf("packet buff payload : %s\n",packet->payload);
   if(packet->len > RTLP_MAX_PAYLOAD_SIZE){
     return -1;            //TODO stderr
   }
@@ -63,11 +66,10 @@ int send_packet(struct pkbuf* packet, int sockfd, struct sockaddr_in serv_addr){
   memcpy(rtlp_packet+8,&packet->hdr.total_msg_size,4);
   memcpy(rtlp_packet+12,packet->payload,packet->len);
   printf("Data set\n");
-  printf("Taille int:%d\n",sizeof(int));
   printf("Udp packet type : %d\n",*rtlp_packet);
   printf("Udp packet seqnbr : %d\n",*(rtlp_packet+4));
   printf("Udp packet total_msg_size : %d\n",*(rtlp_packet+8));
-
+  
   /* write message to socket */
   if(sendto(sockfd, rtlp_packet, packet->len+12, 0, (struct sockaddr *) &serv_addr, sizeof(serv_addr)) < 0)
   {
@@ -82,17 +84,21 @@ int send_packet(struct pkbuf* packet, int sockfd, struct sockaddr_in serv_addr){
 
 }
 
-struct pkbuf* udp_to_pkbuf(struct pkbuf* pkbuffer, char * udppacket){
+struct pkbuf* udp_to_pkbuf(struct pkbuf* pkbuffer, char * udppacket, int len){
 
   int type,seqnbr,total_msg_size;
   char * payload;
-  
+ 
+  printf("Packet udp size: %d\n",  sizeof(udppacket));
+  printf("Packet char size: %d\n",  sizeof(char));
+  printf("Packet int size: %d\n",  sizeof(int));
+
   memcpy(&type,udppacket,4);
   memcpy(&seqnbr,udppacket+4,4);
   memcpy(&total_msg_size,udppacket+8,4);
   payload= udppacket+12;
   
-  return create_pkbuf(pkbuffer,type,seqnbr,total_msg_size,payload,sizeof(udppacket-12));
+  return create_pkbuf(pkbuffer,type,seqnbr,total_msg_size,payload,len);
 
 }
 
