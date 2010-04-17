@@ -428,15 +428,30 @@ int rtlp_close(struct rtlp_client_pcb *cpcb)
 
 int treat_arq(struct rtlp_client_pcb *cpcb, char *outfile) {
 
+  
+  printf(">>>Treat arq\n");
+
   int i,numRead;
   struct pkbuf pkbuffer;
   char udp_buffer[RTLP_MAX_PAYLOAD_SIZE+12];
   FILE *output;
+  
+  printf("Buffer send state\n");
+  for(i=0;i<cpcb->window_size;i++){
+    printf("%d ",cpcb->send_buf[i].hdr.seqnbr);
+  }
 
+  printf("\nBuffer send state\n");
+  for(i=0;i<cpcb->window_size;i++){
+     printf("%d ",cpcb->send_buf[i].hdr.seqnbr);
+  }
+  printf("\n");
 
   if(outfile == NULL){
+    printf("Out = stdout\n");
     output = stdout;    
   } else {
+    printf("Out = %s\n",outfile);
     output = fopen( outfile, "a");
   }
 
