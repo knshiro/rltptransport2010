@@ -1,4 +1,3 @@
-
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -183,12 +182,12 @@ int rtlp_transfer_loop(struct rtlp_server_pcb *spcb)
 				}
 				spcb->last_seq_num_sent = spcb->last_seq_num_sent +1;
 				udp_to_pkbuf(&pkbuffer, udp_buffer,len_packet);
-				if (pkbuffer.hdr.type == RTLP_TYPE_DATA) {		
+				if (pkbuffer.hdr.type == RTLP_TYPE_DATA) {              
 
 					//Read the data to know what the client asked for
 					//The client wants the list of the files
-					if(strcmp(pkbuffer.payload,"SLIST")==0) {	
-						printf("Enter SLIST IF\n");	
+					if(strcmp(pkbuffer.payload,"SLIST")==0) {       
+						printf("Enter SLIST IF\n");     
 						//Read the directory
 						char **files;
 						const char *path = ".";
@@ -206,8 +205,8 @@ int rtlp_transfer_loop(struct rtlp_server_pcb *spcb)
 						while(u<nb_files2) {  
 							strcat(list_to_send,files[u]); 
 							strcat(list_to_send,"\n");
-							u++;			
-						}		
+							u++;                    
+						}               
 						printf("list to send: %s\n",list_to_send);
 						//Number of packets: here it is 1 since we dont have much to send (only the list).
 						msg_size = 1;
@@ -219,20 +218,20 @@ int rtlp_transfer_loop(struct rtlp_server_pcb *spcb)
 						printf("End SLIST IF\n");
 					}
 					//The client requests a file (GET)
-					else if (pkbuffer.payload[0] == 'G' && pkbuffer.payload[1] == 'E' && pkbuffer.payload[2] == 'T') {	
+					else if (pkbuffer.payload[0] == 'G' && pkbuffer.payload[1] == 'E' && pkbuffer.payload[2] == 'T') {      
 
 						//Get the name of the file
 						len = strlen(pkbuffer.payload);
 						for(k=0;k<len-4;k++)
 							filename[k]=pkbuffer.payload[k+4];
 
-						//Get the size of the file and calculate the number of packets		 
+						//Get the size of the file and calculate the number of packets           
 						f = fopen(filename, "rb"); 
 
 						if (f != NULL) {
 							fseek(f, 0, SEEK_END); 
 							longlen= ftell(f);
-							fseek(f, 0, 0); 	
+							fseek(f, 0, 0);         
 						}
 						if(longlen%RTLP_MAX_PAYLOAD_SIZE >0){
 							msg_size = longlen/RTLP_MAX_PAYLOAD_SIZE + 1;
@@ -272,7 +271,7 @@ int rtlp_transfer_loop(struct rtlp_server_pcb *spcb)
 				}
 
 			}
-		}			
+		}                       
 
 		//Initialize send_packet_buffer. 
 		for(j=0;j<spcb->window_size;j++){
@@ -289,7 +288,7 @@ int rtlp_transfer_loop(struct rtlp_server_pcb *spcb)
 			while(i<msg_size && j<spcb->window_size){   
 				if(spcb->send_buf[j].hdr.seqnbr == -1){  //Check if the buffer has free space
 					bzero(data,RTLP_MAX_PAYLOAD_SIZE);
-					if(i<msg_size-1)		
+					if(i<msg_size-1)                
 						fread(data,RTLP_MAX_PAYLOAD_SIZE,1,f);
 					else {
 						fread(data,length_last_packet,1,f);
@@ -303,7 +302,7 @@ int rtlp_transfer_loop(struct rtlp_server_pcb *spcb)
 					}else{
 						create_pkbuf(&pkbuffer, RTLP_TYPE_DATA,spcb->last_seq_num_sent + 1,msg_size,data,RTLP_MAX_PAYLOAD_SIZE);
 					}
-					memcpy(&spcb->send_buf[j],&pkbuffer,sizeof(struct pkbuf));      		
+					memcpy(&spcb->send_buf[j],&pkbuffer,sizeof(struct pkbuf));                      
 					i++;
 					spcb->last_seq_num_sent = spcb->last_seq_num_sent + 1; //Increase the seq. number
 				}
@@ -364,7 +363,7 @@ int rtlp_transfer_loop(struct rtlp_server_pcb *spcb)
 				//clear the set ahead of time
 				FD_ZERO(&readfds);
 				// add our descriptors to the set 
-				FD_SET(spcb->sockfd, &readfds);	
+				FD_SET(spcb->sockfd, &readfds); 
 			}
 
 			tv.tv_sec = 3;
@@ -444,7 +443,7 @@ int rtlp_transfer_loop(struct rtlp_server_pcb *spcb)
 						u = pkbuffer.hdr.seqnbr - spcb->last_seq_num_received;
 						packets_received[u-1] = (char*)malloc(sizeof(char));
 						packets_received[u-1] = pkbuffer.payload;
-						if(u==1) {		
+						if(u==1) {              
 							//Update the value of the last packet acknowledged.
 							spcb->last_seq_num_received = pkbuffer.hdr.seqnbr;
 							packets_received_check[u-1] = 1;
@@ -455,7 +454,7 @@ int rtlp_transfer_loop(struct rtlp_server_pcb *spcb)
 								nb_acks= nb_acks+1;
 							}
 						}
-						else {	
+						else {  
 							//We don't acknowledge.
 							packets_received_check[u-1] = 1;
 						}
@@ -488,12 +487,12 @@ int rtlp_transfer_loop(struct rtlp_server_pcb *spcb)
 							u = pkbuffer.hdr.seqnbr - first_seq_number - nb_acks;
 							packets_received[u-1] = (char*)malloc(sizeof(char));
 							packets_received[u-1] = pkbuffer.payload;
-							//Check if we can send an ACK.	PROBLEME: on check seulement jusqu'a u-1 mais on peut avoir deja recu des paquets situé apres !!!
+							//Check if we can send an ACK.  PROBLEME: on check seulement jusqu'a u-1 mais on peut avoir deja recu des paquets situé apres !!!
 							for(t=spcb->last_seq_num_received;t<u-1;t++) {
 								if(packets_received_check[t]==0) {
 									check_reception=0;
 									break;
-								}					
+								}                                       
 							}
 							if(check_reception==1) {
 								//We can ack
@@ -502,7 +501,7 @@ int rtlp_transfer_loop(struct rtlp_server_pcb *spcb)
 								if(send_packet(&pkbuffer, spcb->sockfd, from) <0){
 									exit(-1);
 									nb_acks= nb_acks+1;
-								}	
+								}       
 							}
 						}
 					}
@@ -512,7 +511,7 @@ int rtlp_transfer_loop(struct rtlp_server_pcb *spcb)
 			send=0;
 		}
 	}
-	return 0;	
+	return 0;       
 }
 
 
@@ -600,7 +599,4 @@ error_close:
 error:
 	return NULL;
 }
-
-
-
 
