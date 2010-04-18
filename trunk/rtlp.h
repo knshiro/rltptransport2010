@@ -92,7 +92,9 @@ struct rtlp_server_pcb {
 	int state;			/* Connection state */
 
 	/* Your extensions here */
-	struct pkbuf send_buf[RTLP_MAX_SEND_BUF_SIZE]; 	
+	struct pkbuf send_buf[RTLP_MAX_SEND_BUF_SIZE]; 
+	struct pkbuf receive_buf[RTLP_MAX_SEND_BUF_SIZE];
+	int  receive_buf_full[RTLP_MAX_SEND_BUF_SIZE];	
   	int window_size;
 	struct sockaddr_in client_addr;  /* The address of the client connected */
 	int last_seq_num_sent;  
