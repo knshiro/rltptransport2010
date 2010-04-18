@@ -148,7 +148,7 @@ int rtlp_transfer(struct rtlp_client_pcb *cpcb, void *data, int len,
     printf(">>>>Transfert\n");
 
 
-    int i,msg_size = 1,sendAck = 0,returnValue = 0;
+    int i,sendAck = 0,returnValue = 0;
     struct pkbuf pkbuffer;
     FILE *output = NULL;
     struct timeval tv;
@@ -204,7 +204,7 @@ int rtlp_transfer(struct rtlp_client_pcb *cpcb, void *data, int len,
         //There is data to send, try to put it in the buffer a first time
         printf(">>>Try to send data (first time)\n");
     
-        create_pkbuf(&pkbuffer, RTLP_TYPE_DATA,(cpcb->last_seq_num_sent+1),msg_size,data,len); 
+        create_pkbuf(&pkbuffer, RTLP_TYPE_DATA,(cpcb->last_seq_num_sent+1),cpcb->total_msg_size,data,len); 
         
         if( (returnValue = fill_pck_buf(cpcb,&pkbuffer))<1){       
             //If there was not free slot in the packet buffer wait for some ack and try again
