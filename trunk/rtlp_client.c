@@ -256,7 +256,7 @@ int rtlp_transfer(struct rtlp_client_pcb *cpcb, void *data, int len,
     printf(">>>>Transfert\n");
 
 
-    int i,msg_size,done,sendAck = 0;
+    int i,msg_size = 1,sendAck = 0;
     struct pkbuf pkbuffer;
     FILE *output = NULL;
     struct timeval tv;
@@ -447,7 +447,7 @@ int treat_socket_buf(struct rtlp_client_pcb *cpcb) {
 
     printf(">>>Treat arq\n");
 
-    int i,numRead,returnValue;
+    int i,numRead,returnValue = 0;
     struct pkbuf pkbuffer;
     char udp_buffer[RTLP_MAX_PAYLOAD_SIZE+12];
 
@@ -551,6 +551,7 @@ int fill_pck_buf(struct rtlp_client_pcb *cpcb,struct pkbuf * pkbuffer){
         if(cpcb->send_buf[i].hdr.seqnbr == -1){ 
             cpcb->time_send[i] = time(0);
             memcpy(&cpcb->send_buf[i],pkbuffer,sizeof(struct pkbuf));
+            send_packet(&cpcb->send_buf[i],cpcb->sockfd,cpcb->serv_addr);
             done = 1; 
         }
         i++;
