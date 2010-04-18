@@ -517,7 +517,7 @@ int rtlp_transfer_loop(struct rtlp_server_pcb *spcb)
 				printf("Number of repeat: %d\n",repeat);
 			//After 3 retransmissions, abort the transfer.
 			if (repeat>2){
-				printf("The client does not answer anymore. Abort transfer.\n");
+				printf("******   The client does not answer anymore. Abort transfer. ******\n");
 				rtlp_server_reset(spcb,&from);
 				return -1;
 			}
@@ -534,6 +534,7 @@ int rtlp_transfer_loop(struct rtlp_server_pcb *spcb)
 			}
 		}
 
+		
 		//The client sends a file to the server
 		while(file_size<msg_size && send==2){
 			printf("Entered the 'function' PUT\n");
@@ -548,7 +549,7 @@ int rtlp_transfer_loop(struct rtlp_server_pcb *spcb)
 			FD_SET(spcb->sockfd, &readfds);
 
 
-			while(select(spcb->sockfd+1, &readfds, NULL, NULL, &tv)>0 && file_size<msg_size) {
+			while(srv=select(spcb->sockfd+1, &readfds, NULL, NULL, &tv)>0 && file_size<msg_size) {
 				if (FD_ISSET(spcb->sockfd, &readfds)) {
 
 					bzero(udp_buffer, sizeof(udp_buffer));
@@ -639,6 +640,12 @@ int rtlp_transfer_loop(struct rtlp_server_pcb *spcb)
 						return -1;
 					}
 				}
+			}
+			//Timeout: No answer from the client.
+			if(srv==0){
+				printf("****** The client does not answer anymore. Abort transfer. ******\n");
+				rtlp_server_reset(spcb,&from);
+				return -1;
 			}
 		}
 	
