@@ -3,9 +3,6 @@
 
 struct pkbuf* create_pkbuf(struct pkbuf* buff, int type,int seqnbr,int msg_size, char * payload, int len){
 
-  printf("\n>create_pkbuf\n");
-
-		  printf("Payload Length: %d\n",len);
 	struct rtlp_hdr hdr;
 
 	hdr.type = type;
@@ -20,7 +17,6 @@ struct pkbuf* create_pkbuf(struct pkbuf* buff, int type,int seqnbr,int msg_size,
 		  return NULL;
 		}
 		if(len>0) {
-		  printf("Copying payload %d\n",len);
 		  memcpy(buff->payload,payload,len);
 		  buff->len = len;
 		} else {
@@ -30,8 +26,6 @@ struct pkbuf* create_pkbuf(struct pkbuf* buff, int type,int seqnbr,int msg_size,
      buff->len = 0;
    }
   memcpy(&buff->hdr,&hdr,sizeof(struct rtlp_hdr));
-
-  printf("<create_pkbuf\n");
 
   return buff;
 
@@ -49,7 +43,7 @@ int create_udp_payload(struct pkbuf* packet, char * rtlp_packet){
 }
 
 
-int send_packet(struct pkbuf* packet, int sockfd, struct sockaddr_in serv_addr){
+int send_packet(int loss_prob, struct pkbuf* packet, int sockfd, struct sockaddr_in serv_addr){
 
   printf("\n>>send_packet\n");
   printf("Packet Buff type: %d\n",packet->hdr.type);
@@ -73,7 +67,7 @@ int send_packet(struct pkbuf* packet, int sockfd, struct sockaddr_in serv_addr){
   printf("Udp packet total_msg_size : %d\n",*(rtlp_packet+8));
   
   /* write message to socket */
-  if(sendto_unrel(sockfd, rtlp_packet, packet->len+12, 0, (struct sockaddr *) &serv_addr, sizeof(serv_addr), 0.3) < 0 )
+  if(sendto_unrel(sockfd, rtlp_packet, packet->len+12, 0, (struct sockaddr *) &serv_addr, sizeof(serv_addr), loss_prob) < 0 )
   {
     perror("Could not send packet!");
     return -1;
