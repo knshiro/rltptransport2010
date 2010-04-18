@@ -2,9 +2,9 @@
 
 struct pkbuf* create_pkbuf(struct pkbuf* buff, int type,int seqnbr,int msg_size, char * payload, int len){
 
-  printf(">create_pkbuf\n");
+  printf("\n>create_pkbuf\n");
 
-		  printf("Len %d\n",len);
+		  printf("Payload Length: %d\n",len);
 	struct rtlp_hdr hdr;
 
 	hdr.type = type;
@@ -30,7 +30,7 @@ struct pkbuf* create_pkbuf(struct pkbuf* buff, int type,int seqnbr,int msg_size,
    }
   memcpy(&buff->hdr,&hdr,sizeof(struct rtlp_hdr));
 
-  printf("<create_pkbuf\n\n");
+  printf("<create_pkbuf\n");
 
   return buff;
 
@@ -50,7 +50,7 @@ int create_udp_payload(struct pkbuf* packet, char * rtlp_packet){
 
 int send_packet(struct pkbuf* packet, int sockfd, struct sockaddr_in serv_addr){
 
-  printf(">>send_packet\n");
+  printf("\n>>send_packet\n");
   printf("Packet Buff type: %d\n",packet->hdr.type);
   printf("Packet Buff seqnbr: %d\n",packet->hdr.seqnbr);
   printf("Packet Buff total_msg_size: %d\n",packet->hdr.total_msg_size);
