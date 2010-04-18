@@ -256,7 +256,7 @@ int rtlp_transfer(struct rtlp_client_pcb *cpcb, void *data, int len,
     printf(">>>>Transfert\n");
 
 
-    int i,msg_size,done,sendAck;
+    int i,msg_size,done,sendAck = 0;
     struct pkbuf pkbuffer;
     FILE *output = NULL;
     struct timeval tv;
