@@ -1,5 +1,6 @@
 #include "RTLP_util.h"
 #include "sendto_unrel.h"
+extern int debug;
 
 struct pkbuf* create_pkbuf(struct pkbuf* buff, int type,int seqnbr,int msg_size, char * payload, int len){
 
@@ -38,19 +39,30 @@ int create_udp_payload(struct pkbuf* packet, char * rtlp_packet){
   memcpy(rtlp_packet+4,&packet->hdr.seqnbr,4);
   memcpy(rtlp_packet+8,&packet->hdr.total_msg_size,4);
   memcpy(rtlp_packet+12,packet->payload,packet->len);
-  printf("Data set\n");
-
 }
 
 
 int send_packet(float loss_prob, struct pkbuf* packet, int sockfd, struct sockaddr_in serv_addr){
 
-  printf("\n>>send_packet\n");
-  printf("Packet Buff type: %d\n",packet->hdr.type);
-  printf("Packet Buff seqnbr: %d\n",packet->hdr.seqnbr);
-  printf("Packet Buff total_msg_size: %d\n",packet->hdr.total_msg_size);
-  printf("packet buff len : %d\n",packet->len);
-  //printf("packet buff payload : %s\n",packet->payload);
+  if(debug==1){
+  	printf("Packet Received:\n");
+  	switch (packet->hdr.type)
+     		{
+		case '1':
+  		printf("Type: DATA\n");
+		case '2':
+		printf("Type: ACK\n");
+		case '3':
+		printf("Type: SYN\n");
+		case '4':
+		printf("Type: FIN\n");
+		case '5':
+		printf("Type: RESET\n");
+		}
+  	printf("Seq Nbr: %d\n",packet->hdr.seqnbr);
+  	printf("Payload: %d\n",packet->len);
+  }
+
   if(packet->len > RTLP_MAX_PAYLOAD_SIZE){
     return -1;            //TODO stderr
   }
@@ -61,10 +73,6 @@ int send_packet(float loss_prob, struct pkbuf* packet, int sockfd, struct sockad
   memcpy(rtlp_packet+4,&packet->hdr.seqnbr,4);
   memcpy(rtlp_packet+8,&packet->hdr.total_msg_size,4);
   memcpy(rtlp_packet+12,packet->payload,packet->len);
-  printf("Data set\n");
-  printf("Udp packet type : %d\n",*rtlp_packet);
-  printf("Udp packet seqnbr : %d\n",*(rtlp_packet+4));
-  printf("Udp packet total_msg_size : %d\n",*(rtlp_packet+8));
   
   /* write message to socket */
   if(sendto_unrel(sockfd, rtlp_packet, packet->len+12, 0, (struct sockaddr *) &serv_addr, sizeof(serv_addr), loss_prob) < 0 )
@@ -72,9 +80,6 @@ int send_packet(float loss_prob, struct pkbuf* packet, int sockfd, struct sockad
     perror("Could not send packet!");
     return -1;
   }
-  printf("Packet sent %d\n",  strlen(rtlp_packet));
-  
-  printf("<<send_packet\n\n");
 
   return 0;
 
@@ -85,14 +90,34 @@ struct pkbuf* udp_to_pkbuf(struct pkbuf* pkbuffer, char * udppacket, int len){
   int type,seqnbr,total_msg_size;
   char * payload;
  
-  printf("Packet udp size: %d\n",  sizeof(udppacket));
+  //printf("Packet udp size: %d\n",  sizeof(udppacket));
 
   memcpy(&type,udppacket,4);
   memcpy(&seqnbr,udppacket+4,4);
   memcpy(&total_msg_size,udppacket+8,4);
   payload= udppacket+12;
   
+
   return create_pkbuf(pkbuffer,type,seqnbr,total_msg_size,payload,len-12);
+
+  if(debug==1){
+  	printf("Packet Received:\n");
+  	switch (pkbuffer->hdr.type)
+     		{
+		case '1':
+  		printf("Type: DATA\n");
+		case '2':
+		printf("Type: ACK\n");
+		case '3':
+		printf("Type: SYN\n");
+		case '4':
+		printf("Type: FIN\n");
+		case '5':
+		printf("Type: FIN\n");
+		}
+  	printf("Seq Nbr: %d\n",pkbuffer->hdr.seqnbr);
+  	printf("Payload: %d\n",pkbuffer->len);
+  }
 
 }
 

@@ -8,6 +8,9 @@
 #include <unistd.h>
 #include <ctype.h>
 
+int debug=0;
+float lossprob=0;
+
 int main(int argc, char **argv)
 {
 
@@ -22,7 +25,6 @@ int main(int argc, char **argv)
   int c;
   opterr = 0;
   int port;
-  int debug = 0;
 
   while ((c = getopt (argc, argv, "dl:w:")) != -1) {	
 	switch (c)
@@ -79,7 +81,6 @@ int main(int argc, char **argv)
   }
     
 int check = rtlp_listen(&spcb, port);
-spcb.lossprob = lossprob;
 printf("The server is listening....\n");
 check = rtlp_accept(&spcb);
 int check3 = rtlp_transfer_loop(&spcb);
