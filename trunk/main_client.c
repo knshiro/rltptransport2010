@@ -167,6 +167,7 @@ int main(int argc, char **argv)
                 dataSent = 1;
                 cpcb.total_msg_size = msg_size;
                 while(i<msg_size){
+                    printf(">>>>>>>>>>>>>>Try to send packet %d<<<<<<<<<<\n\n",i);
                     if(i<msg_size-1){
                         current_length = RTLP_MAX_PAYLOAD_SIZE;
                     } else {
@@ -179,12 +180,17 @@ int main(int argc, char **argv)
                         if(dataSent){ 
                             bzero(data,RTLP_MAX_PAYLOAD_SIZE);           
                             fread(data,current_length,1,f);
+                        }
+                    printf(">>>>>>>>>>>>>>CAS N : Try to send packet %d<<<<<<<<<<\n\n",i);
+                        dataSent = rtlp_transfer(&cpcb,data,current_length,NULL);
+                        if(dataSent){
                             i++;
                         }
-                        dataSent = rtlp_transfer(&cpcb,data,current_length,NULL);
                     }
                     
                     if(strcmp(cmd,"r")==0){
+                        
+                    printf(">>>>>>>>>>>>>>CAS R Try to send packet %d<<<<<<<<<<\n\n",i);
                         rtlp_transfer(&cpcb,NULL,0,NULL);	
                     }
                     if(strcmp(cmd,"q")==0){
