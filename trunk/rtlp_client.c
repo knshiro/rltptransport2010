@@ -411,10 +411,13 @@ int treat_socket_buf(struct rtlp_client_pcb *cpcb) {
  */
 int treat_rtlp_buf(struct rtlp_client_pcb *cpcb, FILE *output, int sendAck){
 
+    printf(">>>>Treat_rtlp_buff\n");
+    print_state_cpcb(cpcb);
+
     int i=0;
     struct pkbuf pkbuffer;
     // Write to the output
-    while(cpcb->recv_buf[i].hdr.seqnbr != -1 && i<cpcb->window_size+1){
+    while(cpcb->recv_buf[i].hdr.seqnbr != -1 && i<cpcb->window_size){
         write_to_output(&cpcb->recv_buf[i],output,cpcb); 
         cpcb->recv_buf[i].hdr.seqnbr = -1;
         i++;
@@ -432,6 +435,7 @@ int treat_rtlp_buf(struct rtlp_client_pcb *cpcb, FILE *output, int sendAck){
         create_pkbuf(&pkbuffer,RTLP_TYPE_ACK,cpcb->last_seq_num_sent,0,NULL,0);
         send_packet(&pkbuffer,cpcb->sockfd,cpcb->serv_addr);
     }
+    printf("<<<<Treat_rtlp_buff\n");
     return 0;
 }
 
@@ -486,7 +490,7 @@ void write_to_output(struct pkbuf* buffer, FILE *output, struct rtlp_client_pcb 
         printf("%s",buffer->payload);
     }
     else {
-        printf("Writing in the file %d bytes\n",buffer->len);
+        printf("Writing in the file %d bytes from packet number %d\n",buffer->len,buffer->hdr.seqnbr);
         cpcb->size_received++;
         cpcb->total_msg_size = buffer->hdr.total_msg_size;
         //printf("Payload written %s\n", buffer->payload);
