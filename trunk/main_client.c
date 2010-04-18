@@ -84,7 +84,7 @@ int main(int argc, char **argv)
     }
     //Connection
     printf("Try to connect to %s port %d\n",dst_addr,port);
-    if(rtlp_connect(&cpcb, dst_addr,4500)<0){
+    if(rtlp_connect(&cpcb, dst_addr,port)<0){
        fprintf(stderr,"Connexion impossible\n");
        return 1;
     }
@@ -136,9 +136,10 @@ int main(int argc, char **argv)
                 rtlp_close(&cpcb);
                 return 0; 
             }
-
+            
+            //PUT command
             else if(strcmp(cmd,"PUT")==0){
-                               //Write command 
+                //Write command 
                 scanf("%s",outfile);			
                 strcpy(entry,cmd);			
                 strcat(entry," ");
@@ -164,6 +165,7 @@ int main(int argc, char **argv)
                 length_last_packet = longlen - (msg_size-1)*RTLP_MAX_PAYLOAD_SIZE; 
                 i=0;
                 dataSent = 1;
+                cpcb.total_msg_size = msg_size;
                 while(i<msg_size){
                     if(i<msg_size-1){
                         current_length = RTLP_MAX_PAYLOAD_SIZE;
@@ -190,7 +192,8 @@ int main(int argc, char **argv)
                         break;
                     }
                 }
-                break;
+                rtlp_close(&cpcb);
+                return 0; 
             }
         }
 
