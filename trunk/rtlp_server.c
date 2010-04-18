@@ -14,7 +14,7 @@
 #include <dirent.h>
 
 void print_state_spcb(struct rtlp_server_pcb *spcb);
-
+void write_to_output(struct pkbuf* buffer, FILE *output, struct rtlp_server_pcb *spcb);
 
 int rtlp_listen(struct rtlp_server_pcb *spcb, int port){
 
@@ -137,20 +137,31 @@ int rtlp_transfer_loop(struct rtlp_server_pcb *spcb)
 	struct sockaddr_in from;
 	unsigned int fromlen;
 	fromlen = sizeof(from);
+	
+	int length_last_packet;
 
+	//Variables for the PUT
 	int len_packet;
 	int send=4; 
 	FILE * f;
+	int check_full;
+	FILE *output;
+	int file_size=0;
 
+	//Variables for the SLIST
 	char list_to_send[RTLP_MAX_PAYLOAD_SIZE];
 
-	char ** packets_received = (char**)malloc(sizeof(char*));
-	int* packets_received_check = (int*)malloc(sizeof(int));
+	//Variables for the GET
 	int first_seq_number;
 	int nb_acks=0;
-	int check_reception=1;
-	int length_last_packet;
-	int check_ack;	
+	int check_ack;
+	
+	
+	
+	
+
+	
+		
 
 	while(1) {
 		begin:
@@ -263,7 +274,7 @@ int rtlp_transfer_loop(struct rtlp_server_pcb *spcb)
 							filename[k]=pkbuffer.payload[k+4];
 						printf("The client wants to put the file '%s' on the server\n",filename); 
 						//Indicate the first seq nbr of the file to receive
-						first_seq_number = pkbuffer.hdr.seqnbr+2;
+						first_seq_number = pkbuffer.hdr.seqnbr+1;
 						send=2;
 					}
 				}
@@ -497,7 +508,6 @@ int rtlp_transfer_loop(struct rtlp_server_pcb *spcb)
 				return -1;
 			}
 			
-			//printf("check_ack: %d,first_seq_number: %d ,max_ack_received:%d   ,  msg_size: %d\n",check_ack,first_seq_number,spcb->max_ack_received,msg_size);
 		}  
 		if (send<2) {
 			send=4;
@@ -507,14 +517,89 @@ int rtlp_transfer_loop(struct rtlp_server_pcb *spcb)
 
 
 		//The client sends a file to the server
-		//while(send==2){
-		//}
+		while(file_size<msg_size && send==2){
+			//Create the file
+			output = fopen( "output", "a");
+			//We receive something
+			tv.tv_sec=1;
+			while(select(spcb->sockfd+1, &readfds, NULL, NULL, &tv)>0 && file_size<msg_size) {
+				if (FD_ISSET(spcb->sockfd, &readfds)) {
+
+					bzero(udp_buffer, sizeof(udp_buffer));
+					if((len_packet=recv(spcb->sockfd,udp_buffer,sizeof(udp_buffer),0)) < 0) {
+						perror("Couldn't receive from socket");
+					}
+					udp_to_pkbuf(&pkbuffer, udp_buffer,len_packet);
+					printf("Packet of type %d received\n", pkbuffer.hdr.type);
+
+					if ( pkbuffer.hdr.type == RTLP_TYPE_DATA ) {  // If the received message is an ACK
+						//put the payload at the good place
+						
+						i = pkbuffer.hdr.seqnbr - first_seq_number;
+						memcpy(&spcb->receive_buf[i],&pkbuffer,sizeof(struct pkbuf)); 
+						spcb->receive_buf_full[i]=1;
+						file_size++;
+
+						//Check which ACK to send
+						check_full=0;
+						for(k=0;k<spcb->window_size;k++) {
+							if(spcb->receive_buf_full[k]!=1){
+								break;
+							}
+						check_full=k;
+						}
+						create_pkbuf(&pkbuffer, RTLP_TYPE_ACK,first_seq_number+k+1,0, NULL,0);
+						if(send_packet(&pkbuffer, spcb->sockfd, from) <0){
+							return -1;
+						}
+
+						//check if we can write, i.e if all the slots before the new one are full
+						k=0;
+						check_full=-1;
+						while(k<spcb->window_size) {
+							if(spcb->receive_buf_full[k]!=1){
+								break;
+							}
+						k++;
+						check_full++;
+						}
+
+						//If check_full==1, we can write to file from 0 to i
+						for(u=0;u<=check_full;u++) {
+							write_to_output(&(spcb->receive_buf[u]),output, spcb);
+							spcb->receive_buf_full[u]=0;	
+							first_seq_number = spcb->last_seq_num_received+u; 
+						}
+						//decaler
+						int soust = spcb->window_size-check_full-1;	
+						for(u=0;u<soust;u++){
+							spcb->receive_buf[u] = spcb->receive_buf[check_full+u+1]; 
+						}
+						
+					}
+					else {
+						rtlp_server_reset(spcb,&from);
+						printf("Server misbehaviour\n");
+						return -1;
+					}
+				}
+			}
+		}
+	
+		if (send==2) {
+			send=4;
+			printf("The file has been received successfully\n");
+		}
 	}	
 	return 0;       
 }
 
 
+void write_to_output(struct pkbuf* buffer, FILE *output, struct rtlp_server_pcb *spcb){
 
+        printf("Writing in the file %d bytes from packet number %d\n",buffer->len,buffer->hdr.seqnbr);
+        fwrite(buffer->payload,sizeof(char),buffer->len,output);
+}
 
 int rtlp_server_reset(struct rtlp_server_pcb *spcb, struct sockaddr_in *from){
 
@@ -534,6 +619,8 @@ int rtlp_server_reset(struct rtlp_server_pcb *spcb, struct sockaddr_in *from){
 
 
 
+
+
 void print_state_spcb(struct rtlp_server_pcb *spcb){
     int i;
 
@@ -541,7 +628,6 @@ void print_state_spcb(struct rtlp_server_pcb *spcb){
 
     printf("Window size : %d\n",spcb->window_size);
 
-    //printf("Last seq nbr ack : %d\n",spcb->last_seq_num_ack);
     printf("Last seq nbr sent : %d\n",spcb->last_seq_num_sent);
 
   
