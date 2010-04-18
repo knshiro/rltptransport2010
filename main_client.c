@@ -10,97 +10,129 @@
 
 int main(int argc, char **argv)
 {
-struct rtlp_client_pcb cpcb;
-char *dst_addr= "127.0.0.1";
-int check = rtlp_connect(&cpcb, dst_addr,4500);
-printf("rtlp_connect ends : %i\n",check);
+    struct rtlp_client_pcb cpcb;
+    char *dst_addr= "127.0.0.1";
+    int check = rtlp_connect(&cpcb, dst_addr,4500);
+    printf("rtlp_connect ends : %i\n",check);
 
-char *data = "SLIST";
-void *data2 = data;
-char entry[100];
-char cmd[5];
-char outfile[50];
-char payloadbuff[RTLP_MAX_PAYLOAD_SIZE];
+    char entry[100];
+    char cmd[5];
+    char outfile[50];
+    char payloadbuff[RTLP_MAX_PAYLOAD_SIZE];
 
-/*struct pkbuf pkbuffer;
-bzero(payloadbuff,sizeof(payloadbuff));
-memcpy(payloadbuff,data2,RTLP_MAX_PAYLOAD_SIZE);
-create_pkbuf(&pkbuffer, RTLP_TYPE_DATA,3,1,payloadbuff,RTLP_MAX_PAYLOAD_SIZE);
-printf("data envoyé: %s\n",pkbuffer.payload);
-
-if(send_packet(&pkbuffer, cpcb->sockfd, cpcb->serv_addr) <0){
-	exit(-1);
-}
-check = rtlp_test(cpcb);
-/*
-int check2 = rtlp_close(cpcb);
-printf("rtlp_close ends: %i\n",check2);
-
-cpcb.recv_buf[3].hdr.seqnbr = 3;
-cpcb.recv_buf[2].hdr.seqnbr = 2;
-
-swap(cpcb.recv_buf,2,3);
-printf("Packet 2 : %d, Packet 3 : %d",cpcb.recv_buf[2].hdr.seqnbr,cpcb.recv_buf[3].hdr.seqnbr);
-*/
-
-printf(">>>>1st transfert\n");
-//rtlp_transfer(&cpcb,data2,5,NULL);
+    printf(">>>>1st transfert\n");
 
 
-while(1){
+    while(1){
 
-	
-	//fgets(entry,100,stdin);
-	scanf("%s",cmd);
-	printf("Cmd : %s\n",cmd);
-	if(strcmp(cmd,"r")==0){
-		rtlp_transfer(&cpcb,NULL,0,NULL);	
-	}
-	if(strcmp(cmd,"q")==0){
-		break;
-	}
 
-	if(strcmp(cmd,"SLIST")==0){
-		rtlp_transfer(&cpcb,"SLIST",5,NULL);
-	} 
-	else if (strcmp(cmd,"CLIST")==0){
-		//rtlp_transfer(&cpcb,"SLIST",5,outfile);
- 	}
-	else {
-		
-//		printf("%s : Sizeof %d, Strlen %d\n", entry, sizeof(entry), strlen(entry));
-		if(strcmp(cmd,"GET")==0){
-			scanf("%s",outfile);			
-			strcpy(entry,cmd);			
-			strcat(entry," ");
-			strcat(entry,outfile);
-			printf("Cmd : %s Outfile : %s, Entry: %s\n", cmd, outfile,entry);
-			rtlp_transfer(&cpcb,entry,strlen(entry),"output");
-			while(1){
-				scanf("%s",cmd);
-				if(strcmp(cmd,"r")==0){
-					rtlp_transfer(&cpcb,NULL,0,"output");	
-				}
-				if(strcmp(cmd,"q")==0){
-					break;
-				}
-			}
-			break;
-		}
-	}
-	
-}
+        //fgets(entry,100,stdin);
+        scanf("%s",cmd);
+        printf("Cmd : %s\n",cmd);
+        if(strcmp(cmd,"r")==0){
+            rtlp_transfer(&cpcb,NULL,0,NULL);	
+        }
+        if(strcmp(cmd,"q")==0){
+            break;
+        }
 
-return 0;
+        if(strcmp(cmd,"SLIST")==0){
+            rtlp_transfer(&cpcb,"SLIST",5,NULL);
+        } 
+        else if (strcmp(cmd,"CLIST")==0){
+            //rtlp_transfer(&cpcb,"SLIST",5,outfile);
+        }
+        else {
+
+            //GET command
+            if(strcmp(cmd,"GET")==0){
+                scanf("%s",outfile);			
+                strcpy(entry,cmd);			
+                strcat(entry," ");
+                strcat(entry,outfile);
+                printf("Cmd : %s Outfile : %s, Entry: %s\n", cmd, outfile,entry);
+                rtlp_transfer(&cpcb,entry,strlen(entry),"output");
+                while(cpcb.total_msg_size > cpcb.size_received || 1){
+                    scanf("%s",cmd);
+                    if(strcmp(cmd,"r")==0){
+                        rtlp_transfer(&cpcb,NULL,0,"output");	
+                        printf("Received %d of %d packets\n",cpcb.size_received,cpcb.total_msg_size);
+                    }
+                    if(strcmp(cmd,"q")==0){
+                        printf("Transfert interrupted by user\n");
+                        rtlp_client_reset(&cpcb);
+                        return 0;
+                    }
+                }
+                rtlp_close(&cpcb);
+                return 0; 
+            }
+
+
+            else if(strcmp(cmd,"PUT")==0){
+                int i,msg_size,longlen,length_last_packet,current_length;
+                FILE * f;
+
+                //Write command 
+                scanf("%s",outfile);			
+                strcpy(entry,cmd);			
+                strcat(entry," ");
+                strcat(entry,outfile);
+                printf("Cmd : %s Outfile : %s, Entry: %s\n", cmd, outfile,entry);
+
+                //Send command
+                rtlp_transfer(&cpcb,entry,strlen(entry),NULL);
+
+                //Open file
+                fopen(outfile,"rb");
+                if (f != NULL) {
+                    fseek(f, 0, SEEK_END); 
+                    longlen= ftell(f);
+                    fseek(f, 0, 0);         
+                }
+                if(longlen%RTLP_MAX_PAYLOAD_SIZE >0){
+                    msg_size = longlen/RTLP_MAX_PAYLOAD_SIZE + 1;
+                }
+                else {
+                    msg_size = longlen/RTLP_MAX_PAYLOAD_SIZE;
+                }
+                length_last_packet = longlen - (msg_size-1)*RTLP_MAX_PAYLOAD_SIZE; 
+                i=0;
+                while(i<msg_size){
+
+                    if(i<msg_size-1){
+                        current_length = RTLP_MAX_PAYLOAD_SIZE;
+                    }
+                    else {
+                        current_length = length_last_packet;
+                    }
+
+                    scanf("%s",cmd);
+                    if(strcmp(cmd,"r")==0){
+                        rtlp_transfer(&cpcb,NULL,0,NULL);	
+                    }
+                    if(strcmp(cmd,"q")==0){
+                        printf("Transfert interrupted by user\n");
+                        break;
+                    }
+                }
+                break;
+            }
+        }
+
+    }
+
+
+    return 0;
 }
 
 
 
 
 int rtlp_test(struct rtlp_client_pcb *cpcb){
- 
-int sockfd,i,srv,numRead;
-sockfd=cpcb->sockfd;
+
+    int sockfd,i,srv,numRead;
+    sockfd=cpcb->sockfd;
 struct pkbuf *pkbuffer;
 pkbuffer = (struct pkbuf*)malloc(sizeof(struct pkbuf));
 

@@ -489,7 +489,7 @@ void write_to_output(struct pkbuf* buffer, FILE *output, struct rtlp_client_pcb 
         printf("Writing in the file %d bytes\n",buffer->len);
         cpcb->size_received++;
         cpcb->total_msg_size = buffer->hdr.total_msg_size;
-        printf("Payload written %s\n", buffer->payload);
+        //printf("Payload written %s\n", buffer->payload);
         fwrite(buffer->payload,sizeof(char),buffer->len,output);
     }
 
