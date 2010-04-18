@@ -16,9 +16,9 @@ struct pkbuf* udp_to_pkbuf(struct pkbuf* pkbuffer, char * udppacket, int len);
 
 int create_socket(int port);
 
-static char *dup_str(const char *s);
+char *dup_str(const char *s);
 
-static char **get_all_files(char ** files,const char *path,int *nb_files);
+char **get_all_files(char ** files,const char *path,int *nb_files);
 
 
 int swap(struct pkbuf* pkarray,int i, int j);
