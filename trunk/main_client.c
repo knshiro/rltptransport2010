@@ -11,6 +11,9 @@
 
 int clist();
 
+int debug=0;
+float lossprob=0;
+
 int main(int argc, char **argv)
 {
     struct rtlp_client_pcb cpcb;
@@ -26,7 +29,6 @@ int main(int argc, char **argv)
     int i,msg_size,longlen,length_last_packet,current_length,dataSent,srv,nb_timeout;
     FILE * f;
     char data[RTLP_MAX_PAYLOAD_SIZE];
-    int debug = 0;
     int window_size = 8;
     double lossprob = 0;
     char * lvalue = NULL;
@@ -94,7 +96,6 @@ int main(int argc, char **argv)
         return 1;
     }
 
-    cpcb.lossprob = lossprob;
     printf(">>>>1st transfert\n");
 
 
