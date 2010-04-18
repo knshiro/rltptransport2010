@@ -47,11 +47,12 @@ int rtlp_accept(struct rtlp_server_pcb *spcb){
 	unsigned int fromlen, numread;
 	char rtlp_packet[RTLP_MAX_PAYLOAD_SIZE+12];
 	struct sockaddr_in from;
-	char buf[1024];
 	int out_loop;
 	fd_set readfds;
-
+	pid_t pid;
 	fromlen = sizeof(from);
+
+	int sockfd;
 
 	while(1) {
 		FD_ZERO(&readfds);
@@ -86,19 +87,27 @@ int rtlp_accept(struct rtlp_server_pcb *spcb){
 					}
 					printf("Name resolved\n");
 
+					//fork
+					pid=fork();
+					if(pid == 0) {
+												
+						//create socket
+						sockfd = create_socket(-1);
+						spcb->sockfd = sockfd;
 
-					//create pkbuf and send packet
-					create_pkbuf(&pkbuffer, RTLP_TYPE_ACK, 1,0, NULL,0);
-					if((out_loop = send_packet(&pkbuffer, spcb->sockfd, from)) < 0){
-						printf("Problem: cannot send packet\n");
-						exit(-1);
-					}
-					spcb->last_seq_num_sent = 1;
-					if(out_loop == 0) {
-						spcb->state = RTLP_STATE_ESTABLISHED;
-						printf("Connection successful\n");
-						//fork
-						break;
+						//create pkbuf and send packet
+						create_pkbuf(&pkbuffer, RTLP_TYPE_ACK, 1,0, NULL,0);
+						if((out_loop = send_packet(&pkbuffer, spcb->sockfd, from)) < 0){
+							printf("Problem: cannot send packet\n");
+							exit(-1);
+						}	
+						spcb->last_seq_num_sent = 1;
+						if(out_loop == 0) {
+							spcb->state = RTLP_STATE_ESTABLISHED;
+							printf("Connection successful\n");
+						
+							break;
+						}
 					}
 
 				}
@@ -124,7 +133,7 @@ int rtlp_transfer_loop(struct rtlp_server_pcb *spcb)
 
 	struct timeval tv;
 	fd_set readfds;
-	int i,j,k,msg_size,nb_timeout=0,srv,len,u,t;
+	int i,j,k,msg_size,nb_timeout=0,srv,len,u;
 	long longlen;
 	int jump_select=0;
 	struct pkbuf pkbuffer;
@@ -153,7 +162,6 @@ int rtlp_transfer_loop(struct rtlp_server_pcb *spcb)
 
 	//Variables for the GET
 	int first_seq_number;
-	int nb_acks=0;
 	int check_ack;
 	
 	
