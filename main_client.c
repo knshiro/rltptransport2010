@@ -113,6 +113,12 @@ int main(int argc, char **argv)
         else if (strcmp(cmd,"CLIST")==0){
 		int check = clist();
         }
+	else if (strcmp(cmd,"HELP")==0){
+		printf("GET <filename> - Gets the file from the server\n");
+		printf("PUT <filename> - Transfers the file to the server\n");
+		printf("SLIST - Lists the files which the server can access\n");
+		printf("CLIST - Lists the files which the client can access\n");
+	}
         else {
 
             //GET command

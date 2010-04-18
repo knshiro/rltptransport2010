@@ -540,8 +540,8 @@ int rtlp_transfer_loop(struct rtlp_server_pcb *spcb)
 			printf("Entered the 'function' PUT\n");
 			//Create the file
 			output = fopen( "output", "a");
-			//We receive something
-			tv.tv_sec=10;
+			//If we don't receive data within 5 seconds -> Reset
+			tv.tv_sec=5;
 				
 			//clear the set ahead of time
 			FD_ZERO(&readfds);
@@ -549,7 +549,7 @@ int rtlp_transfer_loop(struct rtlp_server_pcb *spcb)
 			FD_SET(spcb->sockfd, &readfds);
 
 
-			while(srv=select(spcb->sockfd+1, &readfds, NULL, NULL, &tv)>0 && file_size<msg_size) {
+			while((srv=select(spcb->sockfd+1, &readfds, NULL, NULL, &tv))>0 && file_size<msg_size) {
 				if (FD_ISSET(spcb->sockfd, &readfds)) {
 
 					bzero(udp_buffer, sizeof(udp_buffer));
