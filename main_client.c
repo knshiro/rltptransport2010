@@ -172,7 +172,7 @@ int main(int argc, char **argv)
                     } else {
                         current_length = length_last_packet;
                     }
-
+                    printf("Packet number %d of size %d\n",i,current_length);
                     scanf("%s",cmd);
                     
                     if(strcmp(cmd,"n")==0){
@@ -181,7 +181,7 @@ int main(int argc, char **argv)
                             fread(data,current_length,1,f);
                             i++;
                         }
-                        dataSent = rtlp_transfer(&cpcb,data,0,NULL);
+                        dataSent = rtlp_transfer(&cpcb,data,current_length,NULL);
                     }
                     
                     if(strcmp(cmd,"r")==0){
