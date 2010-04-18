@@ -584,6 +584,7 @@ int rtlp_transfer_loop(struct rtlp_server_pcb *spcb)
 						printf("check_full Write= %d\n",check_full);
 						//we can write to file from 0 to i
 						for(u=0;u<=check_full;u++) {
+							printf("payload: %s\n",spcb->receive_buf[u].payload);
 							write_to_output(&(spcb->receive_buf[u]),output, spcb);
 							spcb->receive_buf_full[u]=0;	
 						}
@@ -641,6 +642,7 @@ int rtlp_transfer_loop(struct rtlp_server_pcb *spcb)
 void write_to_output(struct pkbuf* buffer, FILE *output, struct rtlp_server_pcb *spcb){
 
         printf("Writing in the file %d bytes from packet number %d\n",buffer->len,buffer->hdr.seqnbr);
+	printf("buffer->payload: %s\n",buffer->payload);
         fwrite(buffer->payload,sizeof(char),buffer->len,output);
 }
 
