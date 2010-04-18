@@ -390,6 +390,13 @@ int rtlp_transfer_loop(struct rtlp_server_pcb *spcb)
 						printf("Termination successful\n");
 						return 0;
 					}
+					else if(pkbuffer.hdr.type == RTLP_TYPE_DATA) {
+						//Acknowledge a DATA packet received out of sequence
+						create_pkbuf(&pkbuffer, RTLP_TYPE_ACK,pkbuffer.hdr.seqnbr+1,0, NULL,0);
+						if(send_packet(&pkbuffer, spcb->sockfd, from) <0){
+							return -1;
+						}
+					}
 					else {
 						rtlp_server_reset(spcb,&from);
 						printf("Server misbehaviour\n");
