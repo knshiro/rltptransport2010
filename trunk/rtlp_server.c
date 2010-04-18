@@ -519,13 +519,20 @@ int rtlp_transfer_loop(struct rtlp_server_pcb *spcb)
 
 		//The client sends a file to the server
 		while(file_size<msg_size && send==2){
-			printf("Ca marche\n");
+			printf("Entered the 'function' PUT\n");
 			//Create the file
 			output = fopen( "output", "a");
 			//We receive something
-			tv.tv_sec=1;
-			while(select(spcb->sockfd+1, &readfds, NULL, NULL, &tv)>0 && file_size<msg_size) {
+			tv.tv_sec=10;
 				
+			//clear the set ahead of time
+			FD_ZERO(&readfds);
+			// add our descriptors to the set 
+			FD_SET(spcb->sockfd, &readfds);
+
+
+			while(select(spcb->sockfd+1, &readfds, NULL, NULL, &tv)>0 && file_size<msg_size) {
+				printf("Received a packet\n");
 				if (FD_ISSET(spcb->sockfd, &readfds)) {
 
 					bzero(udp_buffer, sizeof(udp_buffer));
@@ -537,7 +544,7 @@ int rtlp_transfer_loop(struct rtlp_server_pcb *spcb)
 
 					if ( pkbuffer.hdr.type == RTLP_TYPE_DATA ) {  // If the received message is an ACK
 						//Store msg_size
-						msg_size=pkbuffer.hdr.total_msg_size;
+						msg_size = pkbuffer.hdr.total_msg_size;
 
 						//put the payload at the good place
 						i = pkbuffer.hdr.seqnbr - first_seq_number;
@@ -546,14 +553,14 @@ int rtlp_transfer_loop(struct rtlp_server_pcb *spcb)
 						file_size++;
 
 						//Check which ACK to send
-						check_full=0;
+						check_full=-1;
 						for(k=0;k<spcb->window_size;k++) {
 							if(spcb->receive_buf_full[k]!=1){
 								break;
 							}
 						check_full=k;
 						}
-						create_pkbuf(&pkbuffer, RTLP_TYPE_ACK,first_seq_number+k+1,0, NULL,0);
+						create_pkbuf(&pkbuffer, RTLP_TYPE_ACK,first_seq_number+check_full+1,0, NULL,0);
 						if(send_packet(&pkbuffer, spcb->sockfd, from) <0){
 							return -1;
 						}
@@ -569,7 +576,7 @@ int rtlp_transfer_loop(struct rtlp_server_pcb *spcb)
 						check_full++;
 						}
 
-						//If check_full==1, we can write to file from 0 to i
+						//we can write to file from 0 to i
 						for(u=0;u<=check_full;u++) {
 							write_to_output(&(spcb->receive_buf[u]),output, spcb);
 							spcb->receive_buf_full[u]=0;	
@@ -581,6 +588,27 @@ int rtlp_transfer_loop(struct rtlp_server_pcb *spcb)
 							spcb->receive_buf[u] = spcb->receive_buf[check_full+u+1]; 
 						}
 						
+					}
+					else if(pkbuffer.hdr.type == RTLP_TYPE_FIN)  {
+							create_pkbuf(&pkbuffer, RTLP_TYPE_ACK,spcb->last_seq_num_received+1,0, NULL,0);
+							printf("The server wants to close the connection\n");
+							if(send_packet(&pkbuffer, spcb->sockfd, from) <0){
+								return -1;
+							}
+							spcb->state = RTLP_STATE_FIN_WAIT;
+							tv.tv_sec=10;
+							if(select(spcb->sockfd+1, &readfds, NULL, NULL, &tv)>0){
+								if (FD_ISSET(spcb->sockfd, &readfds)) {
+									bzero(udp_buffer, sizeof(udp_buffer));
+									if((len_packet=recv(spcb->sockfd,udp_buffer,sizeof(udp_buffer),0)) < 0) {
+										perror("Couldn't receive from socket");
+									}
+									udp_to_pkbuf(&pkbuffer, udp_buffer,len_packet);
+									printf("Packet of type %d received\n", pkbuffer.hdr.type );
+									if(pkbuffer.hdr.type == RTLP_TYPE_FIN)
+										goto begin;
+								}
+							}
 					}
 					else {
 						rtlp_server_reset(spcb,&from);
