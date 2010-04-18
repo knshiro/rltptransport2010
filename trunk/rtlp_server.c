@@ -13,6 +13,8 @@
 #include "rtlp.h"
 #include <dirent.h>
 
+void print_state_spcb(struct rtlp_server_pcb *spcb);
+
 
 int rtlp_listen(struct rtlp_server_pcb *spcb, int port){
 
@@ -174,7 +176,7 @@ int rtlp_transfer_loop(struct rtlp_server_pcb *spcb)
 				}
 
 				printf("Packet of type %d received\n", pkbuffer.hdr.type);
-				
+				print_state_spcb(spcb);
 				//Send an ACK
 				create_pkbuf(&pkbuffer, RTLP_TYPE_ACK,spcb->last_seq_num_sent+1,0, NULL,0);
 				if(send_packet(&pkbuffer, spcb->sockfd, from) <0){
@@ -182,13 +184,15 @@ int rtlp_transfer_loop(struct rtlp_server_pcb *spcb)
 				}
 				printf("ACK of the query sent\n");
 				spcb->last_seq_num_sent = spcb->last_seq_num_sent +1;
+				printf("spcb->last_seq_num_sent: %d\n",spcb->last_seq_num_sent);
+				//spcb->last_seq_num_sent = pkbuffer.hdr.seqnbr + 1;
 				udp_to_pkbuf(&pkbuffer, udp_buffer,len_packet);
 				
 				if (pkbuffer.hdr.type == RTLP_TYPE_DATA) {              
 					//Read the data to know what the client asked for
 					//The client wants the list of files
 					if(strcmp(pkbuffer.payload,"SLIST")==0) {       
-						printf("The client requested the LIST\n");     
+						printf("**********  The client requested the LIST ********** \n");     
 						//Read the directory
 						char **files;
 						const char *path = ".";
@@ -226,7 +230,7 @@ int rtlp_transfer_loop(struct rtlp_server_pcb *spcb)
 						bzero(filename, 50);
 						for(k=0;k<len-4;k++)
 							filename[k]=pkbuffer.payload[k+4];
-						printf("The client requested the file '%s'\n",filename); 
+						printf("**********   THE CLIENT REQUESTS A FILE  ************* '%s'\n",filename); 
 						//Get the size of the file and calculate the number of packets           
 						f = fopen(filename, "rb"); 
 
@@ -323,6 +327,8 @@ int rtlp_transfer_loop(struct rtlp_server_pcb *spcb)
 					memcpy(&spcb->send_buf[j],&pkbuffer,sizeof(struct pkbuf));                      
 					i++;
 					spcb->last_seq_num_sent = spcb->last_seq_num_sent + 1; //Increase the seq. number
+					
+					print_state_spcb(spcb);
 				}
 				j++;
 			}
@@ -521,5 +527,29 @@ int rtlp_server_reset(struct rtlp_server_pcb *spcb, struct sockaddr_in *from){
 
 }
 
+
+
+void print_state_spcb(struct rtlp_server_pcb *spcb){
+    int i;
+
+    printf("=================CPCB state===================\n");
+
+    printf("Window size : %d\n",spcb->window_size);
+
+    //printf("Last seq nbr ack : %d\n",spcb->last_seq_num_ack);
+    printf("Last seq nbr sent : %d\n",spcb->last_seq_num_sent);
+
+  
+
+
+    printf("Buffer send state\n");
+    for(i=0;i<spcb->window_size;i++){
+        printf("%d ",spcb->send_buf[i].hdr.seqnbr);
+    }
+
+    printf("\n");
+
+    printf("=================CPCB state===================\n");
+}
 
 
