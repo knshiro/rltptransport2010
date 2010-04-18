@@ -7,23 +7,87 @@
 #include <string.h>
 #include <unistd.h>
 #include <string.h>
+#include <ctype.h>
 
 int main(int argc, char **argv)
 {
     struct rtlp_client_pcb cpcb;
-    char *dst_addr= "127.0.0.1";
-    int check = rtlp_connect(&cpcb, dst_addr,4500);
-    printf("rtlp_connect ends : %i\n",check);
+    char *dst_addr = NULL;
+    int port;
 
     char entry[100];
     char cmd[5];
     char outfile[50];
-    char payloadbuff[RTLP_MAX_PAYLOAD_SIZE];
     
     int i,msg_size,longlen,length_last_packet,current_length,dataSent;
     FILE * f;
     char data[RTLP_MAX_PAYLOAD_SIZE];
+    int debug = 0;
+    int window_size = 8;
+    double lossprob = 0;
+    char * lvalue = NULL;
+    char * wvalue = NULL;
+    int c;
+    opterr = 0;
 
+    while ((c = getopt (argc, argv, "dw:l:")) != -1) {
+        switch (c)
+        {
+            case 'd':
+                debug = 1;
+                break;
+            case 'w':
+                wvalue = optarg; 
+                break;
+            case 'l':
+                lvalue = optarg;
+                break; 
+            case '?':
+                if (optopt == 'w' || optopt == 'l')
+                    fprintf (stderr, "Option -%c requires an argument.\n", optopt);
+                else if (isprint (optopt))
+                    fprintf (stderr, "Unknown option `-%c'.\n", optopt);
+                else
+                    fprintf (stderr,
+                            "Unknown option character `\\x%x'.\n",
+                            optopt);
+                return 1;
+            default:
+                abort ();
+        }
+    }
+    if(argc - optind< 2) {
+        fprintf(stderr,"Usage %s [-d] [-l lossprob] [-w send_window] server port\n", argv[0]); 
+        return 1;
+    } else {
+        dst_addr = argv[optind];
+        port = atoi(argv[optind+1]);
+    }
+    if(lvalue != NULL){
+        lossprob = atof(lvalue);
+        if(lossprob > 1 || lossprob < 0){
+            fprintf (stderr, "lossprob parameter must be between 0 and 1\n");
+            return 1;
+        }
+    }
+    if(wvalue != NULL){
+        window_size = atoi(wvalue);
+        if(window_size > RTLP_MAX_SEND_BUF_SIZE){
+            window_size = RTLP_MAX_SEND_BUF_SIZE;
+            printf("Warning : window size exceed max size, set to %d\n",window_size);
+        } 
+        else if (window_size < 1){
+            window_size = 8;
+            fprintf (stderr, "Window size must be > 1\n");
+            return 1;
+        }
+    }
+    //Connection
+    printf("Try to connect to %s port %d\n",dst_addr,port);
+    if(rtlp_connect(&cpcb, dst_addr,4500)<0){
+       fprintf(stderr,"Connexion impossible\n");
+       return 1;
+    }
 
     printf(">>>>1st transfert\n");
 
@@ -85,7 +149,7 @@ int main(int argc, char **argv)
                 rtlp_transfer(&cpcb,entry,strlen(entry),NULL);
 
                 //Open file
-                fopen(outfile,"rb");
+                f = fopen(outfile,"rb");
                 if (f != NULL) {
                     fseek(f, 0, SEEK_END); 
                     longlen= ftell(f);
@@ -138,7 +202,7 @@ int main(int argc, char **argv)
 
 
 
-
+/*
 int rtlp_test(struct rtlp_client_pcb *cpcb){
 
     int sockfd,i,srv,numRead;
@@ -182,3 +246,4 @@ int rtlp_test(struct rtlp_client_pcb *cpcb){
     }
 
 }
+*/
