@@ -14,7 +14,6 @@
 #include <dirent.h>
 #include <sys/wait.h>
 
-extern float lossprob;
 
 void print_state_spcb(struct rtlp_server_pcb *spcb);
 void write_to_output(struct pkbuf* buffer, FILE *output, struct rtlp_server_pcb *spcb);
@@ -101,7 +100,7 @@ int rtlp_accept(struct rtlp_server_pcb *spcb){
 
 						//create pkbuf and send packet
 						create_pkbuf(&pkbuffer, RTLP_TYPE_ACK, 1,0, NULL,0);
-						if((out_loop = send_packet(lossprob,&pkbuffer, spcb->sockfd, from)) < 0){
+						if((out_loop = send_packet(&pkbuffer, spcb->sockfd, from)) < 0){
 							printf("Problem: cannot send packet\n");
 							exit(-1);
 						}	
@@ -185,6 +184,7 @@ int rtlp_transfer_loop(struct rtlp_server_pcb *spcb)
 		FD_SET(spcb->sockfd, &readfds);
 
 		tv.tv_sec = 2;
+        tv.tv_usec = 0;
 		srv = select(spcb->sockfd+1, &readfds, NULL, NULL, 0);
 		if (srv == -1) {
 			perror("select"); // error occurred in select()
@@ -204,7 +204,7 @@ int rtlp_transfer_loop(struct rtlp_server_pcb *spcb)
 				//Send an ACK IF it is not already an ACK
 				if(pkbuffer.hdr.type!=RTLP_TYPE_ACK) {
 					create_pkbuf(&pkbuffer2, RTLP_TYPE_ACK,spcb->last_seq_num_sent+1,0, NULL,0);
-					if(send_packet(lossprob,&pkbuffer2, spcb->sockfd, from) <0){
+					if(send_packet(&pkbuffer2, spcb->sockfd, from) <0){
 						return -1;
 					}
 				spcb->last_seq_num_sent = spcb->last_seq_num_sent +1;
@@ -292,11 +292,12 @@ int rtlp_transfer_loop(struct rtlp_server_pcb *spcb)
 				else if(pkbuffer.hdr.type == RTLP_TYPE_FIN) {
 					create_pkbuf(&pkbuffer, RTLP_TYPE_ACK,spcb->last_seq_num_received+1,0, NULL,0);
 					printf("The server wants to close the connection\n");
-					if(send_packet(lossprob,&pkbuffer, spcb->sockfd, from) <0){
+					if(send_packet(&pkbuffer, spcb->sockfd, from) <0){
 						return -1;
 					}
 					spcb->state = RTLP_STATE_FIN_WAIT;
 					tv.tv_sec=10;
+                    tv.tv_usec = 0;
 					if(select(spcb->sockfd+1, &readfds, NULL, NULL, &tv)>0){
 						goto begin;
 					}
@@ -360,7 +361,7 @@ int rtlp_transfer_loop(struct rtlp_server_pcb *spcb)
 			//Send the packets in the buffer
 			for(j=0;j<spcb->window_size;j++){
 				if(spcb->send_buf[j].hdr.seqnbr != -1){
-					send_packet(lossprob,&spcb->send_buf[j], spcb->sockfd, from);
+					send_packet(&spcb->send_buf[j], spcb->sockfd, from);
 				}
 			}
 
@@ -372,6 +373,7 @@ int rtlp_transfer_loop(struct rtlp_server_pcb *spcb)
 			FD_SET(spcb->sockfd, &readfds);
 			
 			tv.tv_sec = 0;
+            tv.tv_usec = 0;
 		
 			//If there are already ACKs.
 			while(select(spcb->sockfd+1, &readfds, NULL, NULL, &tv)>0) {
@@ -399,11 +401,12 @@ int rtlp_transfer_loop(struct rtlp_server_pcb *spcb)
 					else if(pkbuffer.hdr.type == RTLP_TYPE_FIN)  {
 						create_pkbuf(&pkbuffer, RTLP_TYPE_ACK,spcb->last_seq_num_received+1,0, NULL,0);
 						printf("*****   The server wants to close the connection   ******\n");
-						if(send_packet(lossprob,&pkbuffer, spcb->sockfd, from) <0){
+						if(send_packet(&pkbuffer, spcb->sockfd, from) <0){
 							return -1;
 						}
 						spcb->state = RTLP_STATE_FIN_WAIT;
 						tv.tv_sec=10;
+                        tv.tv_usec = 0;
 						if(select(spcb->sockfd+1, &readfds, NULL, NULL, &tv)>0){
 							if (FD_ISSET(spcb->sockfd, &readfds)) {
 								bzero(udp_buffer, sizeof(udp_buffer));
@@ -423,7 +426,7 @@ int rtlp_transfer_loop(struct rtlp_server_pcb *spcb)
 					else if(pkbuffer.hdr.type == RTLP_TYPE_DATA) {
 						//Acknowledge a DATA packet received out of sequence
 						create_pkbuf(&pkbuffer, RTLP_TYPE_ACK,pkbuffer.hdr.seqnbr+1,0, NULL,0);
-						if(send_packet(lossprob,&pkbuffer, spcb->sockfd, from) <0){
+						if(send_packet(&pkbuffer, spcb->sockfd, from) <0){
 							return -1;
 						}
 					}
@@ -442,6 +445,7 @@ int rtlp_transfer_loop(struct rtlp_server_pcb *spcb)
 			}
 
 			tv.tv_sec = 1;
+            tv.tv_usec = 0;
 			//If there were not already ACKs, we wait for some.
 			if(jump_select!=1) {
 				printf("There is no ACK in the socket, we are waiting for one second for some\n");
@@ -471,11 +475,12 @@ int rtlp_transfer_loop(struct rtlp_server_pcb *spcb)
 						else if(pkbuffer.hdr.type == RTLP_TYPE_FIN)  {
 							create_pkbuf(&pkbuffer, RTLP_TYPE_ACK,spcb->last_seq_num_received+1,0, NULL,0);
 							printf("The server wants to close the connection\n");
-							if(send_packet(lossprob,&pkbuffer, spcb->sockfd, from) <0){
+							if(send_packet(&pkbuffer, spcb->sockfd, from) <0){
 								return -1;
 							}
 							spcb->state = RTLP_STATE_FIN_WAIT;
 							tv.tv_sec=10;
+                            tv.tv_usec = 0;
 							if(select(spcb->sockfd+1, &readfds, NULL, NULL, &tv)>0){
 								if (FD_ISSET(spcb->sockfd, &readfds)) {
 									bzero(udp_buffer, sizeof(udp_buffer));
@@ -533,6 +538,7 @@ int rtlp_transfer_loop(struct rtlp_server_pcb *spcb)
 			output = fopen( "output", "a");
 			//If we don't receive data within 5 seconds -> Reset
 			tv.tv_sec=5;
+            tv.tv_usec = 0;
 				
 			//clear the set ahead of time
 			FD_ZERO(&readfds);
@@ -571,7 +577,7 @@ int rtlp_transfer_loop(struct rtlp_server_pcb *spcb)
 						}
 						//printf("check_full ACK= %d\n",check_full);
 						create_pkbuf(&pkbuffer, RTLP_TYPE_ACK,first_seq_number+check_full+1,0, NULL,0);
-						if(send_packet(lossprob,&pkbuffer, spcb->sockfd, from) <0){
+						if(send_packet(&pkbuffer, spcb->sockfd, from) <0){
 							return -1;
 						}
 
@@ -606,11 +612,12 @@ int rtlp_transfer_loop(struct rtlp_server_pcb *spcb)
 					else if(pkbuffer.hdr.type == RTLP_TYPE_FIN)  {
 							create_pkbuf(&pkbuffer, RTLP_TYPE_ACK,spcb->last_seq_num_received+1,0, NULL,0);
 							printf("The server wants to close the connection\n");
-							if(send_packet(lossprob,&pkbuffer, spcb->sockfd, from) <0){
+							if(send_packet(&pkbuffer, spcb->sockfd, from) <0){
 								return -1;
 							}
 							spcb->state = RTLP_STATE_FIN_WAIT;
 							tv.tv_sec=10;
+                            tv.tv_usec = 0;
 							if(select(spcb->sockfd+1, &readfds, NULL, NULL, &tv)>0){
 								if (FD_ISSET(spcb->sockfd, &readfds)) {
 									bzero(udp_buffer, sizeof(udp_buffer));
@@ -661,7 +668,7 @@ int rtlp_server_reset(struct rtlp_server_pcb *spcb, struct sockaddr_in *from){
 
 	printf("Reset packet created\n");
 
-	if(send_packet(lossprob,&pkbuffer, spcb->sockfd, *from) <0){
+	if(send_packet(&pkbuffer, spcb->sockfd, *from) <0){
 		return -1;
 	}
 	spcb->state = RTLP_STATE_CLOSED;
