@@ -9,6 +9,8 @@
 #include <string.h>
 #include <ctype.h>
 
+int clist();
+
 int main(int argc, char **argv)
 {
     struct rtlp_client_pcb cpcb;
@@ -109,7 +111,7 @@ int main(int argc, char **argv)
             rtlp_transfer(&cpcb,"SLIST",5,NULL);
         } 
         else if (strcmp(cmd,"CLIST")==0){
-            //rtlp_transfer(&cpcb,"SLIST",5,outfile);
+		int check = clist();
         }
         else {
 
@@ -207,6 +209,38 @@ int main(int argc, char **argv)
 
 
     return 0;
+}
+
+
+int clist(){
+
+	char **files;
+	const char *path = ".";
+	int nb_files;
+	nb_files=0;
+	int u;
+	char list_client[RTLP_MAX_PAYLOAD_SIZE];
+	files = get_all_files(files,path,&nb_files);
+	printf("nb_files: %i\n",nb_files);
+	if (!files) {
+		printf("Cannot read the directory\n");
+		return -1;
+	}
+	//Put the char** files into a char*
+	u=0;
+						
+	while(u<nb_files-2) {  
+		if(strcmp(files[u],".")!=0 || strcmp(files[u],"..")!=0){
+			strcat(list_client,files[u]); 
+			strcat(list_client,"\n");
+			u++;                 
+		}   
+	}            
+	printf("List Client:\n%s\n",list_client);
+	while(u--) {
+		free(files[u]);
+	}
+        return 0;
 }
 
 
