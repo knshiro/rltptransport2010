@@ -363,7 +363,7 @@ int rtlp_close(struct rtlp_client_pcb *cpcb)
 int treat_socket_buf(struct rtlp_client_pcb *cpcb) {
 
 
-    printf(">>>Treat arq\n");
+    printf(">>>Treat socket buffer\n");
 
     int i,numRead,returnValue = 0;
     struct pkbuf pkbuffer;
@@ -476,7 +476,9 @@ int treat_rtlp_buf(struct rtlp_client_pcb *cpcb, FILE *output, int sendAck){
  
 int fill_pck_buf(struct rtlp_client_pcb *cpcb,struct pkbuf * pkbuffer){
    int i=0,done=0;
-   
+  
+    printf(">>>>Writing packet to the send buffer");
+
     while(!done && i < cpcb->window_size){
         if(cpcb->send_buf[i].hdr.seqnbr == -1){
             printf("Found the place %d in the buffer, send the packet %d\n",i,pkbuffer->hdr.seqnbr);
