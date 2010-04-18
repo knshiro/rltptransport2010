@@ -173,7 +173,7 @@ int rtlp_transfer_loop(struct rtlp_server_pcb *spcb)
 				}
 
 				printf("Packet of type %d received\n", pkbuffer.hdr.type);
-
+				
 				//Send an ACK
 				create_pkbuf(&pkbuffer, RTLP_TYPE_ACK,spcb->last_seq_num_sent+1,0, NULL,0);
 				printf("1st packet ACK created\n");
@@ -182,6 +182,7 @@ int rtlp_transfer_loop(struct rtlp_server_pcb *spcb)
 				}
 				spcb->last_seq_num_sent = spcb->last_seq_num_sent +1;
 				udp_to_pkbuf(&pkbuffer, udp_buffer,len_packet);
+				
 				if (pkbuffer.hdr.type == RTLP_TYPE_DATA) {              
 
 					//Read the data to know what the client asked for
@@ -210,7 +211,7 @@ int rtlp_transfer_loop(struct rtlp_server_pcb *spcb)
 						printf("list to send: %s\n",list_to_send);
 						//Number of packets: here it is 1 since we dont have much to send (only the list).
 						msg_size = 1;
-						send=1;   // to enter the next loop (in order to send the list)
+						send=0;   // to enter the next loop (in order to send the list)
 						memcpy(data,list_to_send,strlen(list_to_send));
 
 						length_last_packet = strlen(list_to_send);
@@ -244,6 +245,7 @@ int rtlp_transfer_loop(struct rtlp_server_pcb *spcb)
 						send=1;
 						length_last_packet = longlen - (msg_size-1)*RTLP_MAX_PAYLOAD_SIZE;
 						first_seq_number = pkbuffer.hdr.seqnbr+2;   //first sequence number of the file sent
+						printf("seqnbr from GET: %d\n",pkbuffer.hdr.seqnbr);
 					}
 					//The client wants to put a file on the server.
 					else if(pkbuffer.payload[0] == 'P' && pkbuffer.payload[1] == 'U' && pkbuffer.payload[2] == 'T') {
@@ -282,19 +284,19 @@ int rtlp_transfer_loop(struct rtlp_server_pcb *spcb)
 		int repeat = 0;
 		spcb->max_ack_received=0;
 		//Process to send the WHOLE file and handle the acks.
-		while( check_ack!=msg_size && send==1 ){
+		while( check_ack!=msg_size && send<2 ){
 			j=0;  
 			//Fill the packet buffer
 			while(i<msg_size && j<spcb->window_size){   
 				if(spcb->send_buf[j].hdr.seqnbr == -1){  //Check if the buffer has free space
 					bzero(data,RTLP_MAX_PAYLOAD_SIZE);
-					if(i<msg_size-1)                
+					if(i<msg_size-1 && send == 1)                
 						fread(data,RTLP_MAX_PAYLOAD_SIZE,1,f);
-					else {
+					else if(send == 1) {
 						fread(data,length_last_packet,1,f);
 					}
-					printf("long: %d\n",length_last_packet);
-					printf("data: %s\n",data);
+					//printf("long: %d\n",length_last_packet);
+					//printf("data in pkbuffer: %s\n",data);
 					bzero(payloadbuff,sizeof(payloadbuff));
 					//memcpy(payloadbuff,data,RTLP_MAX_PAYLOAD_SIZE); //read MAX_PAYLOAD_SIZE and put it in the buffer
 					if(i==msg_size-1){
@@ -310,10 +312,9 @@ int rtlp_transfer_loop(struct rtlp_server_pcb *spcb)
 			}
 			j=0;// j = number of packets that we sent.
 			//Send the packets in the buffer
-			for(k=0;k<spcb->window_size;k++){
+			for(j=0;j<spcb->window_size;j++){
 				if(spcb->send_buf[j].hdr.seqnbr != -1){
 					send_packet(&spcb->send_buf[j], spcb->sockfd, from);
-					j++;
 				}
 			}
 
@@ -402,7 +403,9 @@ int rtlp_transfer_loop(struct rtlp_server_pcb *spcb)
 					}
 				}
 			}
+			check_ack=spcb->max_ack_received-first_seq_number;
 			repeat = repeat + 1;
+			printf("check_ack: %d,first_seq_number: %d ,max_ack_received:%d   ,  msg_size: %d\n",check_ack,first_seq_number,spcb->max_ack_received,msg_size);
 		}  
 
 
