@@ -531,6 +531,7 @@ void print_state_cpcb(struct rtlp_client_pcb *cpcb){
         printf("%d ",cpcb->recv_buf[i].hdr.seqnbr);
     }
     printf("\n");
+    printf("Server address %s and port %d\n",inet_ntoa(cpcb->serv_addr.sin_addr), ntohs(cpcb->serv_addr.sin_port) );
 
     printf("=================CPCB state===================\n");
 }
