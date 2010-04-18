@@ -43,7 +43,7 @@ int create_udp_payload(struct pkbuf* packet, char * rtlp_packet){
 }
 
 
-int send_packet(int loss_prob, struct pkbuf* packet, int sockfd, struct sockaddr_in serv_addr){
+int send_packet(float loss_prob, struct pkbuf* packet, int sockfd, struct sockaddr_in serv_addr){
 
   printf("\n>>send_packet\n");
   printf("Packet Buff type: %d\n",packet->hdr.type);

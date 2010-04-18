@@ -11,10 +11,10 @@
 int main(int argc, char **argv)
 {
 
-  struct rtlp_server_pcb* spcb = (struct rtlp_server_pcb *)malloc(sizeof(struct rtlp_server_pcb));
+  struct rtlp_server_pcb spcb;
 
 
-  spcb->window_size=8;
+  spcb.window_size=8;
 
   double lossprob = 0;
   char * lvalue = NULL;
@@ -66,21 +66,22 @@ int main(int argc, char **argv)
   }
 
   if(wvalue != NULL){
-        spcb->window_size = atoi(wvalue);
-        if(spcb->window_size > RTLP_MAX_SEND_BUF_SIZE){
-            spcb->window_size = RTLP_MAX_SEND_BUF_SIZE;
-            printf("Warning : window size exceed max size, set to %d\n",spcb->window_size);
+        spcb.window_size = atoi(wvalue);
+        if(spcb.window_size > RTLP_MAX_SEND_BUF_SIZE){
+            spcb.window_size = RTLP_MAX_SEND_BUF_SIZE;
+            printf("Warning : window size exceed max size, set to %d\n",spcb.window_size);
         } 
   }
-  else if (spcb->window_size < 1){
-            spcb->window_size = 8;
+  else if (spcb.window_size < 1){
+            spcb.window_size = 8;
             fprintf (stderr, "Window size must be > 1\n");
             return 1;
   }
     
-int check = rtlp_listen(spcb, port);
+int check = rtlp_listen(&spcb, port);
+spcb.lossprob = lossprob;
 printf("The server is listening....\n");
-check = rtlp_accept(spcb);
-int check3 = rtlp_transfer_loop(spcb);
+check = rtlp_accept(&spcb);
+int check3 = rtlp_transfer_loop(&spcb);
 return 0;
 }
