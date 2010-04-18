@@ -19,6 +19,11 @@ int main(int argc, char **argv)
     char cmd[5];
     char outfile[50];
     char payloadbuff[RTLP_MAX_PAYLOAD_SIZE];
+    
+    int i,msg_size,longlen,length_last_packet,current_length,dataSent;
+    FILE * f;
+    char data[RTLP_MAX_PAYLOAD_SIZE];
+
 
     printf(">>>>1st transfert\n");
 
@@ -68,13 +73,8 @@ int main(int argc, char **argv)
                 return 0; 
             }
 
-
             else if(strcmp(cmd,"PUT")==0){
-                int i,msg_size,longlen,length_last_packet,current_length;
-                FILE * f;
-                char data[RTLP_MAX_PAYLOAD_SIZE];
-
-                //Write command 
+                               //Write command 
                 scanf("%s",outfile);			
                 strcpy(entry,cmd);			
                 strcat(entry," ");
@@ -99,19 +99,23 @@ int main(int argc, char **argv)
                 }
                 length_last_packet = longlen - (msg_size-1)*RTLP_MAX_PAYLOAD_SIZE; 
                 i=0;
+                dataSent = 1;
                 while(i<msg_size){
-
                     if(i<msg_size-1){
                         current_length = RTLP_MAX_PAYLOAD_SIZE;
-                    }
-                    else {
+                    } else {
                         current_length = length_last_packet;
                     }
+
                     scanf("%s",cmd);
                     
                     if(strcmp(cmd,"n")==0){
-                        //if(
-                        rtlp_transfer(&cpcb,NULL,0,NULL);	
+                        if(dataSent){ 
+                            bzero(data,RTLP_MAX_PAYLOAD_SIZE);           
+                            fread(data,current_length,1,f);
+                            i++;
+                        }
+                        dataSent = rtlp_transfer(&cpcb,data,0,NULL);
                     }
                     
                     if(strcmp(cmd,"r")==0){
