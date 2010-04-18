@@ -294,11 +294,13 @@ int rtlp_transfer_loop(struct rtlp_server_pcb *spcb)
 		}
 
 		i=0;
+		check_ack=0;
 		int repeat = 0;
 		spcb->max_ack_received=0;
 		//Process to send the WHOLE file and handle the acks.
 		while( check_ack!=msg_size && send<2 ){
 			j=0;  
+			printf("check\n");
 			//Fill the packet buffer
 			while(i<msg_size && j<spcb->window_size){   
 				if(spcb->send_buf[j].hdr.seqnbr == -1){  //Check if the buffer has free space
