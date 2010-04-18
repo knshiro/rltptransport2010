@@ -236,6 +236,7 @@ int rtlp_transfer(struct rtlp_client_pcb *cpcb, void *data, int len,
     for(i=0;i<cpcb->window_size;i++){
         if(cpcb->send_buf[i].hdr.seqnbr != -1){
             current_time = time(0);
+            printf("TIME : %d\n",current_time);
             if(current_time - cpcb->time_send[i] > 2){
                 printf(">>>>>>>>>Timeout packet number : %d\n",cpcb->send_buf[i].hdr.seqnbr);
                 send_packet(&cpcb->send_buf[i],cpcb->sockfd,cpcb->serv_addr);
@@ -278,7 +279,7 @@ int rtlp_close(struct rtlp_client_pcb *cpcb)
     tv.tv_sec = 2;
 
     printf("Try to acknowledge left packets\n");
-    while(cpcb->total_msg_size != cpcb->size_received && cpcb->last_seq_num_ack != cpcb->last_seq_num_sent +1 && i<3){
+/*    while(cpcb->total_msg_size != cpcb->size_received && cpcb->last_seq_num_ack != cpcb->last_seq_num_sent +1 && i<3){
         srv = select(sockfd+1, &readfds, NULL, NULL, &tv);
         printf("Select returned : %d\n",srv);
         if(srv == 0){
@@ -290,13 +291,18 @@ int rtlp_close(struct rtlp_client_pcb *cpcb)
             rtlp_transfer(cpcb,NULL,0,NULL);
             
         }
-        /* clear the set ahead of time */
+        // clear the set ahead of time 
         FD_ZERO(&readfds);
-        /* add our descriptors to the set */
+        // add our descriptors to the set 
         FD_SET(sockfd, &readfds);
     }
+*/
+    // clear the set ahead of time 
+    FD_ZERO(&readfds);
+    // add our descriptors to the set 
+    FD_SET(sockfd, &readfds);
 
-    if(i==3){
+    if (cpcb->total_msg_size != cpcb->size_received && cpcb->last_seq_num_ack != cpcb->last_seq_num_sent +1){  //(i==3){
         printf("Not everything could have been acknowledged\n");
         return -1;       //Timeout
     } else {
@@ -536,10 +542,18 @@ void print_state_cpcb(struct rtlp_client_pcb *cpcb){
         printf("%d ",cpcb->send_buf[i].hdr.seqnbr);
     }
 
+    printf("\nBuffer timestamp state\n");
+    for(i=0;i<cpcb->window_size;i++){
+        printf("%d ",cpcb->time_send[i]);
+    }
+
     printf("\nBuffer recv state\n");
     for(i=0;i<cpcb->window_size;i++){
         printf("%d ",cpcb->recv_buf[i].hdr.seqnbr);
     }
+
+
+
     printf("\n");
     printf("Server address %s and port %d\n",inet_ntoa(cpcb->serv_addr.sin_addr), ntohs(cpcb->serv_addr.sin_port) );
 

@@ -20,8 +20,10 @@ int main(int argc, char **argv)
     char entry[100];
     char cmd[5];
     char outfile[50];
-    
-    int i,msg_size,longlen,length_last_packet,current_length,dataSent;
+
+    fd_set readfds;
+    struct timeval tv;
+    int i,msg_size,longlen,length_last_packet,current_length,dataSent,srv,nb_timeout;
     FILE * f;
     char data[RTLP_MAX_PAYLOAD_SIZE];
     int debug = 0;
@@ -29,6 +31,7 @@ int main(int argc, char **argv)
     double lossprob = 0;
     char * lvalue = NULL;
     char * wvalue = NULL;
+    char * payload = NULL;
     int c;
     opterr = 0;
 
@@ -87,8 +90,8 @@ int main(int argc, char **argv)
     //Connection
     printf("Try to connect to %s port %d\n",dst_addr,port);
     if(rtlp_connect(&cpcb, dst_addr,port)<0){
-       fprintf(stderr,"Connexion impossible\n");
-       return 1;
+        fprintf(stderr,"Connexion impossible\n");
+        return 1;
     }
 
     printf(">>>>1st transfert\n");
@@ -111,7 +114,7 @@ int main(int argc, char **argv)
             rtlp_transfer(&cpcb,"SLIST",5,NULL);
         } 
         else if (strcmp(cmd,"CLIST")==0){
-		int check = clist();
+            int check = clist();
         }
 	else if (strcmp(cmd,"HELP")==0){
 		printf("GET <filename> - Gets the file from the server\n");
@@ -129,23 +132,52 @@ int main(int argc, char **argv)
                 strcat(entry,outfile);
                 printf("Cmd : %s Outfile : %s, Entry: %s\n", cmd, outfile,entry);
                 rtlp_transfer(&cpcb,entry,strlen(entry),"output");
-                while(cpcb.total_msg_size != cpcb.size_received ){
-                    scanf("%s",cmd);
-                    if(strcmp(cmd,"r")==0){
-                        rtlp_transfer(&cpcb,NULL,0,"output");	
-                        printf("Received %d of %d packets\n",cpcb.size_received,cpcb.total_msg_size);
+
+                /* clear the set ahead of time */
+                FD_ZERO(&readfds);
+                /* add our descriptors to the set */
+                FD_SET(0, &readfds);
+                FD_SET(cpcb.sockfd,&readfds);
+                fflush(stdout);
+                tv.tv_sec = 3;
+                nb_timeout=0;
+                while((cpcb.total_msg_size != cpcb.size_received) && nb_timeout<3 ){
+                    srv = select(cpcb.sockfd+1, &readfds, NULL, NULL, &tv);  
+                    if(srv>0){
+                        nb_timeout = 0;
+                    } 
+                    else if(srv == 0) {
+                        nb_timeout++;
                     }
-                    if(strcmp(cmd,"q")==0){
-                        printf("Transfert interrupted by user\n");
-                        rtlp_client_reset(&cpcb);
-                        return 0;
+                    else if(srv == -1){
+                        perror("Select");
+                        return 1;
                     }
+                    printf("Timeout : %d\n",nb_timeout);
+                    /* User typed into the keyboard */
+                    if(FD_ISSET(0, &readfds)) {
+                        fgets(entry, sizeof(entry), stdin);
+                        if(entry[0] == 'q') {
+                            printf("Transfert interrupted by user\n");
+                            rtlp_client_reset(&cpcb);
+                            return 0;
+                        } 
+                    }
+
+                    rtlp_transfer(&cpcb,NULL,0,"output");	
+                    printf("Received %d of %d packets\n",cpcb.size_received,cpcb.total_msg_size);
+                    /* clear the set ahead of time */
+                    FD_ZERO(&readfds);
+                    /* add our descriptors to the set */
+                    FD_SET(0, &readfds);
+                    FD_SET(cpcb.sockfd,&readfds);
                 }
                 rtlp_close(&cpcb);
                 return 0; 
             }
-            
+
             //PUT command
+
             else if(strcmp(cmd,"PUT")==0){
                 //Write command 
                 scanf("%s",outfile);			
@@ -171,40 +203,63 @@ int main(int argc, char **argv)
                     msg_size = longlen/RTLP_MAX_PAYLOAD_SIZE;
                 }
                 length_last_packet = longlen - (msg_size-1)*RTLP_MAX_PAYLOAD_SIZE; 
+
                 i=0;
                 dataSent = 1;
                 cpcb.total_msg_size = msg_size;
-                while(i<msg_size){
+
+                /* clear the set ahead of time */
+                FD_ZERO(&readfds);
+                /* add our descriptors to the set */
+                FD_SET(cpcb.sockfd, &readfds);
+                FD_SET(0, &readfds);
+
+                fflush(stdout);
+                tv.tv_sec = 2;
+                nb_timeout = 0;
+
+                while((i<msg_size || (cpcb.last_seq_num_sent+1 != cpcb.last_seq_num_ack)) && nb_timeout < 3){
+                    
+                    srv = select(cpcb.sockfd+1, &readfds, NULL, NULL, &tv);  
+                    if(srv == 0) {
+                        nb_timeout++;
+                    } else if(srv == -1){
+                        perror("Select");
+                        return 1;
+                    }
+                    /* User typed into the keyboard */
+                    if(FD_ISSET(0, &readfds)) {
+                        fgets(entry, sizeof(entry), stdin);
+                        if(entry[0] == 'q') {
+                            printf("Transfert interrupted by user\n");
+                            rtlp_client_reset(&cpcb);
+                            return 0;
+                        } 
+                    }
                     printf(">>>>>>>>>>>>>>Try to send packet %d<<<<<<<<<<\n\n",i);
                     if(i<msg_size-1){
                         current_length = RTLP_MAX_PAYLOAD_SIZE;
                     } else {
                         current_length = length_last_packet;
                     }
-                    printf("Packet number %d of size %d\n",i,current_length);
-                    scanf("%s",cmd);
-                    
-                    if(strcmp(cmd,"n")==0){
-                        if(dataSent){ 
+                    if(i<msg_size){
+                        if(dataSent){
                             bzero(data,RTLP_MAX_PAYLOAD_SIZE);           
                             fread(data,current_length,1,f);
-                        }
-                    printf(">>>>>>>>>>>>>>CAS N : Try to send packet %d<<<<<<<<<<\n\n",i);
-                        dataSent = rtlp_transfer(&cpcb,data,current_length,NULL);
-                        if(dataSent){
-                            i++;
-                        }
+                            payload = data;
+                        } 
+                    } else {
+                        payload = NULL;
                     }
-                    
-                    if(strcmp(cmd,"r")==0){
-                        
-                    printf(">>>>>>>>>>>>>>CAS R Try to send packet %d<<<<<<<<<<\n\n",i);
-                        rtlp_transfer(&cpcb,NULL,0,NULL);	
+
+                    printf("Packet number %d of size %d\n",i,current_length);
+
+                    if(rtlp_transfer(&cpcb,payload,current_length,NULL) && i<msg_size)
+                    {
+                        dataSent = 1;
+                        i++;
                     }
-                    if(strcmp(cmd,"q")==0){
-                        printf("Transfert interrupted by user\n");
-                        break;
-                    }
+
                 }
                 rtlp_close(&cpcb);
                 return 0; 
@@ -220,79 +275,79 @@ int main(int argc, char **argv)
 
 int clist(){
 
-	char **files;
-	const char *path = ".";
-	int nb_files;
-	nb_files=0;
-	int u;
-	char list_client[RTLP_MAX_PAYLOAD_SIZE];
-	files = get_all_files(files,path,&nb_files);
-	printf("nb_files: %i\n",nb_files);
-	if (!files) {
-		printf("Cannot read the directory\n");
-		return -1;
-	}
-	//Put the char** files into a char*
-	u=0;
-						
-	while(u<nb_files-2) {  
-		if(strcmp(files[u],".")!=0 || strcmp(files[u],"..")!=0){
-			strcat(list_client,files[u]); 
-			strcat(list_client,"\n");
-			u++;                 
-		}   
-	}            
-	printf("List Client:\n%s\n",list_client);
-	while(u--) {
-		free(files[u]);
-	}
-        return 0;
+    char **files;
+    const char *path = ".";
+    int nb_files;
+    nb_files=0;
+    int u;
+    char list_client[RTLP_MAX_PAYLOAD_SIZE];
+    files = get_all_files(files,path,&nb_files);
+    printf("nb_files: %i\n",nb_files);
+    if (!files) {
+        printf("Cannot read the directory\n");
+        return -1;
+    }
+    //Put the char** files into a char*
+    u=0;
+
+    while(u<nb_files-2) {  
+        if(strcmp(files[u],".")!=0 || strcmp(files[u],"..")!=0){
+            strcat(list_client,files[u]); 
+            strcat(list_client,"\n");
+            u++;                 
+        }   
+    }            
+    printf("List Client:\n%s\n",list_client);
+    while(u--) {
+        free(files[u]);
+    }
+    return 0;
 }
 
 
 
 /*
-int rtlp_test(struct rtlp_client_pcb *cpcb){
+   int rtlp_test(struct rtlp_client_pcb *cpcb){
 
-    int sockfd,i,srv,numRead;
-    sockfd=cpcb->sockfd;
-    struct pkbuf *pkbuffer;
-    pkbuffer = (struct pkbuf*)malloc(sizeof(struct pkbuf));
+   int sockfd,i,srv,numRead;
+   sockfd=cpcb->sockfd;
+   struct pkbuf *pkbuffer;
+   pkbuffer = (struct pkbuf*)malloc(sizeof(struct pkbuf));
 
-    char rtlp_packet[RTLP_MAX_PAYLOAD_SIZE+12];
-    fd_set readfds;
+   char rtlp_packet[RTLP_MAX_PAYLOAD_SIZE+12];
+   fd_set readfds;
 
-    while(1) {
+   while(1) {
 
-        srv = select(sockfd+1, &readfds, NULL, NULL, 0);
-        if (srv == -1) {
-            perror("select"); // error occurred in select()
-        } else if (srv == 0) {
-            printf("Timeout occurred! No data after 2 seconds.\n");
-            i++;
-        } else {
-            // one or both of the descriptors have data
-            if (FD_ISSET(sockfd, &readfds)) {
-                bzero(rtlp_packet, sizeof(rtlp_packet));
-                if(numRead = recv(sockfd,rtlp_packet,sizeof(rtlp_packet),0) < 0)
-                {
-                    perror("Couldnt' receive from socket");
-                }
+   srv = select(sockfd+1, &readfds, NULL, NULL, 0);
+   if (srv == -1) {
+   perror("select"); // error occurred in select()
+   } else if (srv == 0) {
+   printf("Timeout occurred! No data after 2 seconds.\n");
+   i++;
+   } else {
+// one or both of the descriptors have data
+if (FD_ISSET(sockfd, &readfds)) {
+bzero(rtlp_packet, sizeof(rtlp_packet));
+if(numRead = recv(sockfd,rtlp_packet,sizeof(rtlp_packet),0) < 0)
+{
+perror("Couldnt' receive from socket");
+}
 
-                udp_to_pkbuf(pkbuffer, rtlp_packet, numRead);
-                printf("PPPPacket of type %d received\n", pkbuffer->hdr.type );
-                if ( pkbuffer->hdr.type == RTLP_TYPE_DATA ) {
-                    printf("Received Data\n");
-                    printf("pkbuffer.payload: %s\n",pkbuffer->payload);	
-                    return 0;
-                } else {
-                    rtlp_client_reset(cpcb);
-                    printf("Server misbehaviour\n");
-                    return -1;
-                }
-            }
-        }
-    }
+udp_to_pkbuf(pkbuffer, rtlp_packet, numRead);
+printf("PPPPacket of type %d received\n", pkbuffer->hdr.type );
+if ( pkbuffer->hdr.type == RTLP_TYPE_DATA ) {
+printf("Received Data\n");
+printf("pkbuffer.payload: %s\n",pkbuffer->payload);	
+return 0;
+} else {
+rtlp_client_reset(cpcb);
+printf("Server misbehaviour\n");
+return -1;
+}
+}
+}
+}
 
 }
 */
