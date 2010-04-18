@@ -73,7 +73,7 @@ int send_packet(struct pkbuf* packet, int sockfd, struct sockaddr_in serv_addr){
   printf("Udp packet total_msg_size : %d\n",*(rtlp_packet+8));
   
   /* write message to socket */
-  if(sendto_unrel(sockfd, rtlp_packet, packet->len+12, 0, (struct sockaddr *) &serv_addr, sizeof(serv_addr), 0.5) < 0 )
+  if(sendto_unrel(sockfd, rtlp_packet, packet->len+12, 0, (struct sockaddr *) &serv_addr, sizeof(serv_addr), 0.3) < 0 )
   {
     perror("Could not send packet!");
     return -1;

@@ -195,8 +195,10 @@ int rtlp_transfer(struct rtlp_client_pcb *cpcb, void *data, int len,
         /* add our descriptors to the set */
         FD_SET(cpcb->sockfd, &readfds);
     }
-    treat_rtlp_buf(cpcb,output,sendAck);
-
+    
+    if (treat_rtlp_buf(cpcb,output,sendAck)<0){
+        return -1;
+    }
     sendAck = 0;
 
     printf("First check done\n");
@@ -226,7 +228,9 @@ int rtlp_transfer(struct rtlp_client_pcb *cpcb, void *data, int len,
                 /* add our descriptors to the set */
                 FD_SET(cpcb->sockfd, &readfds);    
             }
-            treat_rtlp_buf(cpcb,output,sendAck);
+            if (treat_rtlp_buf(cpcb,output,sendAck)<0){
+                return -1;
+            }
             sendAck = 0;
 
             //Fill the packet buffer
@@ -433,7 +437,7 @@ int treat_socket_buf(struct rtlp_client_pcb *cpcb) {
             }
             else{      // Erreur pas de place dans le buffer
                 if ( i>=0 && (( i > cpcb->window_size ) || (cpcb->recv_buf[i].hdr.seqnbr == -1)) ){
-                    printf("!!!!!!!!!!!!!!!!!!!!!ERROR!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
+                    fprintf(stderr,"Buffer error\n");
                     return -1;
                 }
             }
@@ -442,7 +446,6 @@ int treat_socket_buf(struct rtlp_client_pcb *cpcb) {
         case RTLP_TYPE_RST:
             printf("Server reset connection\n");  //TODO stderr
             return -1;
-            break;
         default:
             printf("Server misbehaviour\n");  //TODO stderr
             rtlp_client_reset(cpcb);
