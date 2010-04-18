@@ -536,30 +536,13 @@ int treat_rtlp_buf(struct rtlp_client_pcb *cpcb, FILE *output, int sendAck){
 
     if (cpcb->size_received > 0 || sendAck){    
         // ACK last ack number
-        printf("Send ack number %d\n",cpcb->last_seq_num_sent);
+        printf("Send ack number %d because size received = %d or sendAck = %d\n",cpcb->last_seq_num_sent,cpcb->size_received,sendAck);
         create_pkbuf(&pkbuffer,RTLP_TYPE_ACK,cpcb->last_seq_num_sent,0,NULL,0);
         send_packet(&pkbuffer,cpcb->sockfd,cpcb->serv_addr);
     }
     return 0;
 }
 
-
-/*
-   int sort_buff(struct pkbuf* pkarray, int len){
-
-   int i,min=0;
-
-   if ( len > sizeof(pkarray) ){
-   return -1;    //stderr
-   }
-   for(i=0;i<len;i++){
-   if(pkarray[i].hdr.seqnbr < min && pkarray[i].hdr
-
-   }
-
-   }
-
-*/
  
 int fill_pck_buf(struct rtlp_client_pcb *cpcb,struct pkbuf * pkbuffer){
    int i=0,done=0;
