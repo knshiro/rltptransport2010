@@ -128,7 +128,7 @@ int rtlp_transfer_loop(struct rtlp_server_pcb *spcb)
 	struct pkbuf pkbuffer;
 	char payloadbuff[RTLP_MAX_PAYLOAD_SIZE];
 	char udp_buffer[RTLP_MAX_PAYLOAD_SIZE+12];
-	char *filename=(char *)malloc(sizeof(char));
+	char filename[50];
 	char data[RTLP_MAX_PAYLOAD_SIZE];
 
 	struct sockaddr_in from;
@@ -139,7 +139,7 @@ int rtlp_transfer_loop(struct rtlp_server_pcb *spcb)
 	int send=0; 
 	FILE * f;
 
-	char * list_to_send = (char*)malloc(sizeof(char));
+	char list_to_send[RTLP_MAX_PAYLOAD_SIZE];
 
 	char ** packets_received = (char**)malloc(sizeof(char*));
 	int* packets_received_check = (int*)malloc(sizeof(int));
@@ -202,13 +202,15 @@ int rtlp_transfer_loop(struct rtlp_server_pcb *spcb)
 						}
 						//Put the char** files into a char*
 						u=0;
-						int nb_files2= nb_files;
-						while(u<nb_files2) {  
+						
+						while(u<nb_files) {  
 							strcat(list_to_send,files[u]); 
 							strcat(list_to_send,"\n");
 							u++;                    
 						}            
-						
+						while(u--) {
+							free(files[u]);
+						}
 						//Number of packets: here it is 1 since we dont have much to send (only the list).
 						msg_size = 1;
 						send=0;   // condition to enter the next loop (in order to send the list)
@@ -221,6 +223,7 @@ int rtlp_transfer_loop(struct rtlp_server_pcb *spcb)
 					else if (pkbuffer.payload[0] == 'G' && pkbuffer.payload[1] == 'E' && pkbuffer.payload[2] == 'T') {      
 						//Get the name of the file
 						len = strlen(pkbuffer.payload);
+						bzero(filename, 50);
 						for(k=0;k<len-4;k++)
 							filename[k]=pkbuffer.payload[k+4];
 						printf("The client requested the file '%s'\n",filename); 
@@ -404,7 +407,7 @@ int rtlp_transfer_loop(struct rtlp_server_pcb *spcb)
 			tv.tv_sec = 1;
 			//If there were not already ACKs, we wait for some.
 			if(jump_select!=1) {
-				printf("There were not ACKs in the socket, we wait 5 seconds for some\n");
+				printf("There is no ACK in the socket, we are waiting for one second for some\n");
 				if(select(spcb->sockfd+1, &readfds, NULL, NULL, &tv)>0) {
 					if (FD_ISSET(spcb->sockfd, &readfds)) {
 
@@ -431,7 +434,7 @@ int rtlp_transfer_loop(struct rtlp_server_pcb *spcb)
 						} 
 						else if(pkbuffer.hdr.type == RTLP_TYPE_FIN)  {
 							create_pkbuf(&pkbuffer, RTLP_TYPE_ACK,spcb->last_seq_num_received+1,0, NULL,0);
-							printf("The server wantss to close the connection\n");
+							printf("The server wants to close the connection\n");
 							if(send_packet(&pkbuffer, spcb->sockfd, from) <0){
 								return -1;
 							}
