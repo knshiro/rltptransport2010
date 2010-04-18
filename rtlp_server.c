@@ -192,27 +192,27 @@ int rtlp_transfer_loop(struct rtlp_server_pcb *spcb)
 						//Read the directory
 						char **files;
 						const char *path = ".";
-						int* nb_files=(int*)malloc(sizeof(int));
-						*nb_files=0;
-						files = get_all_files(files,path,nb_files);
-						printf("nb_files: %i\n",*nb_files);
+						int nb_files;
+						nb_files=0;
+						files = get_all_files(files,path,&nb_files);
+						printf("nb_files: %i\n",nb_files);
 						if (!files) {
 							printf("Cannot read the directory\n");
 							return -1;
 						}
 						//Put the char** files into a char*
 						u=0;
-						int nb_files2= *nb_files;
+						int nb_files2= nb_files;
 						while(u<nb_files2) {  
 							strcat(list_to_send,files[u]); 
 							strcat(list_to_send,"\n");
 							u++;                    
-						}               
+						}            
+						
 						//Number of packets: here it is 1 since we dont have much to send (only the list).
 						msg_size = 1;
 						send=0;   // condition to enter the next loop (in order to send the list)
 						memcpy(data,list_to_send,strlen(list_to_send));
-
 						length_last_packet = strlen(list_to_send);
 						first_seq_number = pkbuffer.hdr.seqnbr+2;   //first sequence number of the file sent
 						printf("List of files sent to client (first file is: %s)\n",files[1]);
@@ -299,15 +299,19 @@ int rtlp_transfer_loop(struct rtlp_server_pcb *spcb)
 			//Fill the packet buffer
 			while(i<msg_size && j<spcb->window_size){   
 				if(spcb->send_buf[j].hdr.seqnbr == -1){  //Check if the buffer has free space
-					bzero(data,RTLP_MAX_PAYLOAD_SIZE);
-					if(i<msg_size-1 && send == 1)                
+					
+					if(i<msg_size-1 && send == 1){  
+						bzero(data,RTLP_MAX_PAYLOAD_SIZE);           
 						fread(data,RTLP_MAX_PAYLOAD_SIZE,1,f);
+					}
 					else if(send == 1) {
+						bzero(data,RTLP_MAX_PAYLOAD_SIZE); 
 						fread(data,length_last_packet,1,f);
 					}
 					bzero(payloadbuff,sizeof(payloadbuff));
 					if(i==msg_size-1){
 						create_pkbuf(&pkbuffer, RTLP_TYPE_DATA,spcb->last_seq_num_sent + 1,msg_size,data,length_last_packet); 
+					printf("Payload: %s\n",pkbuffer.payload);
 					}else{
 						create_pkbuf(&pkbuffer, RTLP_TYPE_DATA,spcb->last_seq_num_sent + 1,msg_size,data,RTLP_MAX_PAYLOAD_SIZE);
 					}
@@ -481,107 +485,8 @@ int rtlp_transfer_loop(struct rtlp_server_pcb *spcb)
 
 		//The client sends a file to the server
 		while(send==2){
-			/* 
-			   Regarder dans la socket, mettre les paquets dans le pkbuffer(udp_to_pkbuff),acquitter ceux qui peuvent. Les mettre tous dans un buffer 
-			   intermédiaire classé(pkbuffer2).Quand il y a une suite de données dans le pkbuffer2, on les écrit dans le fichier.
-			   Recommencer.
-			   */
-
-			//clear the set ahead of time
-			FD_ZERO(&readfds);
-			// add our descriptors to the set 
-			FD_SET(spcb->sockfd, &readfds);
-
-			//intitialization:we receive the packet with a query (PUT/GET/FIN/SLIST).
-			srv = select(spcb->sockfd+1, &readfds, NULL, NULL, 0);
-			if (srv == -1) {
-				perror("select"); // error occurred in select()
-				rtlp_server_reset(spcb,&from);
-				exit(-1);
-			} 
-			else {
-				// one or both of the descriptors have data
-				if (FD_ISSET(spcb->sockfd, &readfds)) {
-
-					bzero(udp_buffer, sizeof(udp_buffer));
-					if((len_packet=recvfrom(spcb->sockfd,udp_buffer,sizeof(udp_buffer), 0, (struct sockaddr*)&from, &fromlen)) < 0) {
-						perror("Couldn't receive from socket");
-					}
-					udp_to_pkbuf(&pkbuffer, udp_buffer,len_packet);
-					printf("ePacket of type %d received\n", pkbuffer.hdr.type);
-					if (pkbuffer.hdr.type == RTLP_TYPE_DATA) {
-						msg_size  = pkbuffer.hdr.total_msg_size;
-						u = pkbuffer.hdr.seqnbr - spcb->last_seq_num_received;
-						packets_received[u-1] = (char*)malloc(sizeof(char));
-						packets_received[u-1] = pkbuffer.payload;
-						if(u==1) {              
-							//Update the value of the last packet acknowledged.
-							spcb->last_seq_num_received = pkbuffer.hdr.seqnbr;
-							packets_received_check[u-1] = 1;
-							//acknowledge
-							create_pkbuf(&pkbuffer, RTLP_TYPE_ACK, spcb->last_seq_num_received+1,0, NULL,0);
-							if(send_packet(&pkbuffer, spcb->sockfd, from) <0){
-								exit(-1);
-								nb_acks= nb_acks+1;
-							}
-						}
-						else {  
-							//We don't acknowledge.
-							packets_received_check[u-1] = 1;
-						}
-					}
-
-				}
-			}
-			i=0;
-			while(i<msg_size-1) {
-				// Receive the rest of the data and handle ACKS
-				srv = select(spcb->sockfd+1, &readfds, NULL, NULL, &tv);
-				if (srv == -1) {
-					perror("select"); // error occurred in select()
-					return -1;
-				}  
-				else if (srv == 0) {
-					printf("Timeout occurred! No data after 2 seconds.\n");
-
-				}
-				else {
-					// one or both of the descriptors have data
-					if (FD_ISSET(spcb->sockfd, &readfds)) {
-						bzero(udp_buffer, sizeof(udp_buffer));
-						if((len_packet=recvfrom(spcb->sockfd,udp_buffer,sizeof(udp_buffer), 0, (struct sockaddr*)&from, &fromlen)) < 0) {
-							perror("Couldn't receive from socket");
-						}
-						udp_to_pkbuf(&pkbuffer, udp_buffer,len_packet);
-						printf("Packet of type %d received\n", pkbuffer.hdr.type);
-						if (pkbuffer.hdr.type == RTLP_TYPE_DATA) {
-							u = pkbuffer.hdr.seqnbr - first_seq_number - nb_acks;
-							packets_received[u-1] = (char*)malloc(sizeof(char));
-							packets_received[u-1] = pkbuffer.payload;
-							//Check if we can send an ACK.  PROBLEME: on check seulement jusqu'a u-1 mais on peut avoir deja recu des paquets situé apres !!!
-							for(t=spcb->last_seq_num_received;t<u-1;t++) {
-								if(packets_received_check[t]==0) {
-									check_reception=0;
-									break;
-								}                                       
-							}
-							if(check_reception==1) {
-								//We can ack
-								spcb->last_seq_num_received = pkbuffer.hdr.seqnbr; //pas tout le temps!
-								create_pkbuf(&pkbuffer, RTLP_TYPE_ACK, spcb->last_seq_num_received+1,0, NULL,0);
-								if(send_packet(&pkbuffer, spcb->sockfd, from) <0){
-									exit(-1);
-									nb_acks= nb_acks+1;
-								}       
-							}
-						}
-					}
-				}
-				i++;
-			}
-			send=0;
 		}
-	}
+	}	
 	return 0;       
 }
 
