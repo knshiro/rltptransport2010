@@ -280,7 +280,6 @@ int rtlp_close(struct rtlp_client_pcb *cpcb)
     /* add our descriptors to the set */
     FD_SET(sockfd, &readfds);
 
-    tv.tv_sec = 2;
 
     printf("Try to acknowledge left packets\n");
 /*    while(cpcb->total_msg_size != cpcb->size_received && cpcb->last_seq_num_ack != cpcb->last_seq_num_sent +1 && i<3){
@@ -301,10 +300,6 @@ int rtlp_close(struct rtlp_client_pcb *cpcb)
         FD_SET(sockfd, &readfds);
     }
 */
-    // clear the set ahead of time 
-    FD_ZERO(&readfds);
-    // add our descriptors to the set 
-    FD_SET(sockfd, &readfds);
 
     if (cpcb->total_msg_size != cpcb->size_received && cpcb->last_seq_num_ack != cpcb->last_seq_num_sent +1){  //(i==3){
         printf("Not everything could have been acknowledged\n");
@@ -327,10 +322,10 @@ int rtlp_close(struct rtlp_client_pcb *cpcb)
             /* clear the set ahead of time */
             FD_ZERO(&readfds);
             /* add our descriptors to the set */
-            FD_SET(sockfd, &readfds);
+            FD_SET(cpcb->sockfd, &readfds);
 
             tv.tv_sec = 2;
-            srv = select(sockfd+1, &readfds, NULL, NULL, &tv);
+            srv = select(cpcb->sockfd+1, &readfds, NULL, NULL,&tv);
             if (srv == -1) {
                 perror("select"); // error occurred in select()
                 return -1;

@@ -100,193 +100,204 @@ int main(int argc, char **argv)
 
     while(1){
 
-
-        //fgets(entry,100,stdin);
-        scanf("%s",cmd);
-        printf("Cmd : %s\n",cmd);
-        if(strcmp(cmd,"r")==0){
+        /* clear the set ahead of time */
+        FD_ZERO(&readfds);
+        /* add our descriptors to the set */
+        FD_SET(0, &readfds);
+        FD_SET(cpcb.sockfd,&readfds);
+        tv.tv_sec = 1;
+        if( select(cpcb.sockfd+1, &readfds, NULL, NULL, &tv)<0){
+            perror("Select :");
+            return 1;
+        }  
+        if(FD_ISSET(cpcb.sockfd, &readfds)) {
             rtlp_transfer(&cpcb,NULL,0,NULL);	
         }
-        if(strcmp(cmd,"q")==0){
-            break;
-        }
+        if(FD_ISSET(0, &readfds)) {
+            rtlp_transfer(&cpcb,NULL,0,NULL);	
+            //fgets(entry,100,stdin);
+            scanf("%s",cmd);
+            if(strcmp(cmd,"q")==0){
+                break;
+            }
 
-        if(strcmp(cmd,"SLIST")==0){
-            rtlp_transfer(&cpcb,"SLIST",5,NULL);
-        } 
-        else if (strcmp(cmd,"CLIST")==0){
-            int check = clist();
-        }
-	else if (strcmp(cmd,"HELP")==0){
-		printf("GET <filename> - Gets the file from the server\n");
-		printf("PUT <filename> - Transfers the file to the server\n");
-		printf("SLIST - Lists the files which the server can access\n");
-		printf("CLIST - Lists the files which the client can access\n");
-	}
-        else {
+            if(strcmp(cmd,"SLIST")==0){
+                rtlp_transfer(&cpcb,"SLIST",5,NULL);
+            } 
+            else if (strcmp(cmd,"CLIST")==0){
+                int check = clist();
+            }
+            else if (strcmp(cmd,"HELP")==0){
+                printf("GET <filename> - Gets the file from the server\n");
+                printf("PUT <filename> - Transfers the file to the server\n");
+                printf("SLIST - Lists the files which the server can access\n");
+                printf("CLIST - Lists the files which the client can access\n");
+            }
 
-            //GET command
-            if(strcmp(cmd,"GET")==0){
-                scanf("%s",outfile);			
-                strcpy(entry,cmd);			
-                strcat(entry," ");
-                strcat(entry,outfile);
-                printf("Cmd : %s Outfile : %s, Entry: %s\n", cmd, outfile,entry);
-                rtlp_transfer(&cpcb,entry,strlen(entry),"output");
+            else {
 
-                fflush(stdout);
-                nb_timeout=0;
-                while((cpcb.total_msg_size != cpcb.size_received) && nb_timeout<10 ){
-                tv.tv_sec = 1;
+                //GET command
+                if(strcmp(cmd,"GET")==0){
+                    scanf("%s",outfile);			
+                    strcpy(entry,cmd);			
+                    strcat(entry," ");
+                    strcat(entry,outfile);
+                    printf("Cmd : %s Outfile : %s, Entry: %s\n", cmd, outfile,entry);
+                    rtlp_transfer(&cpcb,entry,strlen(entry),"output");
+
                     fflush(stdout);
-                    /* clear the set ahead of time */
-                    FD_ZERO(&readfds);
-                    /* add our descriptors to the set */
-                    FD_SET(0, &readfds);
-                    FD_SET(cpcb.sockfd,&readfds);
-                    srv = select(cpcb.sockfd+1, &readfds, NULL, NULL, &tv);  
-                    if(srv>0){
-                        nb_timeout = 0;
-                    } 
-                    else if(srv == 0) {
-                        nb_timeout++;
+                    nb_timeout=0;
+                    while((cpcb.total_msg_size != cpcb.size_received) && nb_timeout<10 ){
+                        tv.tv_sec = 1;
+                        fflush(stdout);
+                        /* clear the set ahead of time */
+                        FD_ZERO(&readfds);
+                        /* add our descriptors to the set */
+                        FD_SET(0, &readfds);
+                        FD_SET(cpcb.sockfd,&readfds);
+                        srv = select(cpcb.sockfd+1, &readfds, NULL, NULL, &tv);  
+                        if(srv>0){
+                            nb_timeout = 0;
+                        } 
+                        else if(srv == 0) {
+                            nb_timeout++;
+                        }
+                        else if(srv == -1){
+                            perror("Select");
+                            rtlp_client_reset(&cpcb);
+                            return 1;
+                        }
+                        printf("Timeout : %d\n",nb_timeout);
+                        /* User typed into the keyboard */
+                        if(FD_ISSET(0, &readfds)) {
+                            fgets(entry, sizeof(entry), stdin);
+                            if(entry[0] == 'q') {
+                                printf("Transfert interrupted by user\n");
+                                rtlp_client_reset(&cpcb);
+                                return 0;
+                            } 
+                        }
+
+                        if(rtlp_transfer(&cpcb,NULL,0,"output") < 0){
+                            fprintf(stderr,"Transfert interrupted by server\n");
+                            return 1;
+                        };	
+                        printf("Received %d of %d packets\n",cpcb.size_received,cpcb.total_msg_size);
                     }
-                    else if(srv == -1){
-                        perror("Select");
+                    if(nb_timeout == 10){
+                        printf("Lost connection, too many timeouts\n");
                         rtlp_client_reset(&cpcb);
                         return 1;
                     }
-                    printf("Timeout : %d\n",nb_timeout);
-                    /* User typed into the keyboard */
-                    if(FD_ISSET(0, &readfds)) {
-                        fgets(entry, sizeof(entry), stdin);
-                        if(entry[0] == 'q') {
-                            printf("Transfert interrupted by user\n");
-                            rtlp_client_reset(&cpcb);
-                            return 0;
-                        } 
-                    }
+                    else {
+                        rtlp_close(&cpcb);
+                        return 0; 
+                    } 
+                }
 
-                    if(rtlp_transfer(&cpcb,NULL,0,"output") < 0){
-                            fprintf(stderr,"Transfert interrupted by server\n");
+                //PUT command
+
+                else if(strcmp(cmd,"PUT")==0){
+                    //Write command 
+                    scanf("%s",outfile);			
+                    strcpy(entry,cmd);			
+                    strcat(entry," ");
+                    strcat(entry,outfile);
+                    printf("Cmd : %s Outfile : %s, Entry: %s\n", cmd, outfile,entry);
+
+                    //Send command
+                    rtlp_transfer(&cpcb,entry,strlen(entry),NULL);
+
+                    //Open file
+                    f = fopen(outfile,"rb");
+                    if (f != NULL) {
+                        fseek(f, 0, SEEK_END); 
+                        longlen= ftell(f);
+                        fseek(f, 0, 0);         
+                    }
+                    if(longlen%RTLP_MAX_PAYLOAD_SIZE >0){
+                        msg_size = longlen/RTLP_MAX_PAYLOAD_SIZE + 1;
+                    }
+                    else {
+                        msg_size = longlen/RTLP_MAX_PAYLOAD_SIZE;
+                    }
+                    length_last_packet = longlen - (msg_size-1)*RTLP_MAX_PAYLOAD_SIZE; 
+
+                    i=0;
+                    dataSent = 1;
+                    cpcb.total_msg_size = msg_size;
+
+
+                    nb_timeout = 0;
+
+                    while((i<msg_size || (cpcb.last_seq_num_sent+1 != cpcb.last_seq_num_ack)) && nb_timeout < 10){
+
+                        tv.tv_sec = 1;
+                        fflush(stdout);
+                        /* clear the set ahead of time */
+                        FD_ZERO(&readfds);
+                        /* add our descriptors to the set */
+                        FD_SET(cpcb.sockfd, &readfds);
+                        FD_SET(0, &readfds);
+                        srv = select(cpcb.sockfd+1, &readfds, NULL, NULL, &tv);  
+                        if(srv>0){
+                            nb_timeout = 0;
+                        }
+                        else if(srv == 0) {
+                            nb_timeout++;
+                        } else if(srv == -1){
+                            perror("Select");
+                            rtlp_client_reset(&cpcb);
                             return 1;
-                    };	
-                    printf("Received %d of %d packets\n",cpcb.size_received,cpcb.total_msg_size);
-                }
-                if(nb_timeout == 10){
-                    printf("Lost connection, too many timeouts\n");
-                    rtlp_client_reset(&cpcb);
-                    return 1;
-                }
-                else {
-                    rtlp_close(&cpcb);
-                    return 0; 
-                } 
-            }
+                        }
+                        /* User typed into the keyboard */
+                        if(FD_ISSET(0, &readfds)) {
+                            fgets(entry, sizeof(entry), stdin);
+                            if(entry[0] == 'q') {
+                                printf("Transfert interrupted by user\n");
+                                rtlp_client_reset(&cpcb);
+                                return 0;
+                            } 
+                        }
+                        printf(">>>>>>>>>>>>>>Try to send packet %d<<<<<<<<<<\n\n",i);
+                        if(i<msg_size-1){
+                            current_length = RTLP_MAX_PAYLOAD_SIZE;
+                        } else {
+                            current_length = length_last_packet;
+                        }
+                        if(i<msg_size){
+                            if(dataSent){
+                                bzero(data,RTLP_MAX_PAYLOAD_SIZE);           
+                                fread(data,current_length,1,f);
+                                payload = data;
+                            } 
+                        } else {
+                            payload = NULL;
+                        }
 
-            //PUT command
+                        printf("Packet number %d of size %d\n",i,current_length);
 
-            else if(strcmp(cmd,"PUT")==0){
-                //Write command 
-                scanf("%s",outfile);			
-                strcpy(entry,cmd);			
-                strcat(entry," ");
-                strcat(entry,outfile);
-                printf("Cmd : %s Outfile : %s, Entry: %s\n", cmd, outfile,entry);
-
-                //Send command
-                rtlp_transfer(&cpcb,entry,strlen(entry),NULL);
-
-                //Open file
-                f = fopen(outfile,"rb");
-                if (f != NULL) {
-                    fseek(f, 0, SEEK_END); 
-                    longlen= ftell(f);
-                    fseek(f, 0, 0);         
-                }
-                if(longlen%RTLP_MAX_PAYLOAD_SIZE >0){
-                    msg_size = longlen/RTLP_MAX_PAYLOAD_SIZE + 1;
-                }
-                else {
-                    msg_size = longlen/RTLP_MAX_PAYLOAD_SIZE;
-                }
-                length_last_packet = longlen - (msg_size-1)*RTLP_MAX_PAYLOAD_SIZE; 
-
-                i=0;
-                dataSent = 1;
-                cpcb.total_msg_size = msg_size;
-
-                
-                nb_timeout = 0;
-
-                while((i<msg_size || (cpcb.last_seq_num_sent+1 != cpcb.last_seq_num_ack)) && nb_timeout < 10){
-                    
-                tv.tv_sec = 1;
-                 fflush(stdout);
-                /* clear the set ahead of time */
-                FD_ZERO(&readfds);
-                /* add our descriptors to the set */
-                FD_SET(cpcb.sockfd, &readfds);
-                FD_SET(0, &readfds);
-                    srv = select(cpcb.sockfd+1, &readfds, NULL, NULL, &tv);  
-                    if(srv>0){
-                        nb_timeout = 0;
+                        if(rtlp_transfer(&cpcb,payload,current_length,NULL) && i<msg_size)
+                        {
+                            dataSent = 1;
+                            i++;
+                        }
+                        fflush(stdout);
                     }
-                    else if(srv == 0) {
-                        nb_timeout++;
-                    } else if(srv == -1){
-                        perror("Select");
-                            rtlp_client_reset(&cpcb);
+                    if(nb_timeout == 10){
+                        printf("Lost connection, too many timeouts\n");
+                        rtlp_client_reset(&cpcb);
                         return 1;
                     }
-                    /* User typed into the keyboard */
-                    if(FD_ISSET(0, &readfds)) {
-                        fgets(entry, sizeof(entry), stdin);
-                        if(entry[0] == 'q') {
-                            printf("Transfert interrupted by user\n");
-                            rtlp_client_reset(&cpcb);
-                            return 0;
-                        } 
+                    else {
+                        rtlp_close(&cpcb);
+                        return 0; 
                     }
-                    printf(">>>>>>>>>>>>>>Try to send packet %d<<<<<<<<<<\n\n",i);
-                    if(i<msg_size-1){
-                        current_length = RTLP_MAX_PAYLOAD_SIZE;
-                    } else {
-                        current_length = length_last_packet;
-                    }
-                    if(i<msg_size){
-                        if(dataSent){
-                            bzero(data,RTLP_MAX_PAYLOAD_SIZE);           
-                            fread(data,current_length,1,f);
-                            payload = data;
-                        } 
-                    } else {
-                        payload = NULL;
-                    }
-
-                    printf("Packet number %d of size %d\n",i,current_length);
-
-                    if(rtlp_transfer(&cpcb,payload,current_length,NULL) && i<msg_size)
-                    {
-                        dataSent = 1;
-                        i++;
-                    }
-                    fflush(stdout);
-                }
-                if(nb_timeout == 10){
-                    printf("Lost connection, too many timeouts\n");
-                    rtlp_client_reset(&cpcb);
-                    return 1;
-                }
-                else {
-                    rtlp_close(&cpcb);
-                    return 0; 
                 }
             }
+
         }
-
     }
-
 
     return 0;
 }
