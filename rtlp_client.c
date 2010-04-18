@@ -235,7 +235,7 @@ int rtlp_transfer(struct rtlp_client_pcb *cpcb, void *data, int len,
         if(cpcb->send_buf[i].hdr.seqnbr != -1){
             current_time = time(0);
             if(current_time - cpcb->time_send[i] > 2){
-                printf("Timeout packet number : %d\n",cpcb->send_buf[i].hdr.seqnbr);
+                printf(">>>>>>>>>Timeout packet number : %d\n",cpcb->send_buf[i].hdr.seqnbr);
                 send_packet(&cpcb->send_buf[i],cpcb->sockfd,cpcb->serv_addr);
                 cpcb->time_send[i] = current_time;
             }
@@ -246,7 +246,7 @@ int rtlp_transfer(struct rtlp_client_pcb *cpcb, void *data, int len,
     if(output != NULL){
         fclose(output);
     }
-    printf("<<<<<<< Transfert with return value = %d\n",returnValue);
+    printf("<<<<<<< Transfert with return value = %d\n\n\n",returnValue);
     return returnValue;
 }
 
@@ -274,13 +274,19 @@ int rtlp_close(struct rtlp_client_pcb *cpcb)
     FD_SET(sockfd, &readfds);
 
     tv.tv_sec = 2;
+
+    printf("Try to acknowledge left packets\n");
     while(cpcb->total_msg_size != cpcb->size_received && cpcb->last_seq_num_ack != cpcb->last_seq_num_sent +1 && i<3){
         srv = select(sockfd+1, &readfds, NULL, NULL, &tv);
+        printf("Select returned : %d\n",srv);
         if(srv == 0){
             i++;
-        }else{
+        }else if (srv == -1){
+            rtlp_client_reset(&cpcb);        
+        }
+        else {
             rtlp_transfer(cpcb,NULL,0,NULL);
-            i=0;
+            
         }
         /* clear the set ahead of time */
         FD_ZERO(&readfds);
@@ -296,6 +302,8 @@ int rtlp_close(struct rtlp_client_pcb *cpcb)
         create_pkbuf(pkbuffer, RTLP_TYPE_FIN, cpcb->last_seq_num_sent+1,0, NULL,0);
         i=0;
         while(i<3) {
+            
+            printf("Loop for fin packet\n");
             if(send_packet(pkbuffer, sockfd, cpcb->serv_addr) <0){
                 exit(-1);
             }
