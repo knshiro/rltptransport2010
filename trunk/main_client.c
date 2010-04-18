@@ -11,11 +11,13 @@
 
 int clist();
 
-int debug=0;
-float lossprob=0;
+int debug;
+float lossprob;
 
 int main(int argc, char **argv)
 {
+    debug = 0;
+    lossprob = 0;
     struct rtlp_client_pcb cpcb;
     char *dst_addr = NULL;
     int port;
@@ -72,6 +74,7 @@ int main(int argc, char **argv)
     }
     if(lvalue != NULL){
         lossprob = atof(lvalue);
+        printf("lva %s, los %f\n",lvalue,lossprob);
         if(lossprob > 1 || lossprob < 0){
             fprintf (stderr, "lossprob parameter must be between 0 and 1\n");
             return 1;
@@ -107,6 +110,7 @@ int main(int argc, char **argv)
         FD_SET(0, &readfds);
         FD_SET(cpcb.sockfd,&readfds);
         tv.tv_sec = 1;
+        tv.tv_usec = 0;
         if( select(cpcb.sockfd+1, &readfds, NULL, NULL, &tv)<0){
             perror("Select :");
             return 1;
@@ -150,6 +154,7 @@ int main(int argc, char **argv)
                     nb_timeout=0;
                     while((cpcb.total_msg_size != cpcb.size_received) && nb_timeout<10 ){
                         tv.tv_sec = 1;
+                        tv.tv_usec = 0;
                         fflush(stdout);
                         /* clear the set ahead of time */
                         FD_ZERO(&readfds);
@@ -234,6 +239,7 @@ int main(int argc, char **argv)
                     while((i<msg_size || (cpcb.last_seq_num_sent+1 != cpcb.last_seq_num_ack)) && nb_timeout < 10){
 
                         tv.tv_sec = 1;
+                        tv.tv_usec = 0;
                         fflush(stdout);
                         /* clear the set ahead of time */
                         FD_ZERO(&readfds);

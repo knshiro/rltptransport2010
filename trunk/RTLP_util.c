@@ -1,6 +1,7 @@
 #include "RTLP_util.h"
 #include "sendto_unrel.h"
 extern int debug;
+extern float lossprob;
 
 struct pkbuf* create_pkbuf(struct pkbuf* buff, int type,int seqnbr,int msg_size, char * payload, int len){
 
@@ -42,7 +43,7 @@ int create_udp_payload(struct pkbuf* packet, char * rtlp_packet){
 }
 
 
-int send_packet(float loss_prob, struct pkbuf* packet, int sockfd, struct sockaddr_in serv_addr){
+int send_packet(struct pkbuf* packet, int sockfd, struct sockaddr_in serv_addr){
 
   if(debug==1){
   	printf("Packet Received:\n");
@@ -73,9 +74,8 @@ int send_packet(float loss_prob, struct pkbuf* packet, int sockfd, struct sockad
   memcpy(rtlp_packet+4,&packet->hdr.seqnbr,4);
   memcpy(rtlp_packet+8,&packet->hdr.total_msg_size,4);
   memcpy(rtlp_packet+12,packet->payload,packet->len);
-  
   /* write message to socket */
-  if(sendto_unrel(sockfd, rtlp_packet, packet->len+12, 0, (struct sockaddr *) &serv_addr, sizeof(serv_addr), loss_prob) < 0 )
+  if(sendto_unrel(sockfd, rtlp_packet, packet->len+12, 0, (struct sockaddr *) &serv_addr, sizeof(serv_addr), lossprob) < 0 )
   {
     perror("Could not send packet!");
     return -1;
