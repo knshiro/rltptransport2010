@@ -102,7 +102,7 @@ int rtlp_accept(struct rtlp_server_pcb *spcb){
 
 						//create pkbuf and send packet
 						create_pkbuf(&pkbuffer, RTLP_TYPE_ACK, 1,0, NULL,0);
-						if((out_loop = send_packet(&pkbuffer, spcb->sockfd, from)) < 0){
+						if((out_loop = send_packet(spcb->lossprob,&pkbuffer, spcb->sockfd, from)) < 0){
 							printf("Problem: cannot send packet\n");
 							exit(-1);
 						}	
@@ -206,7 +206,7 @@ int rtlp_transfer_loop(struct rtlp_server_pcb *spcb)
 				//Send an ACK IF it is not already an ACK
 				if(pkbuffer.hdr.type!=RTLP_TYPE_ACK) {
 					create_pkbuf(&pkbuffer2, RTLP_TYPE_ACK,spcb->last_seq_num_sent+1,0, NULL,0);
-					if(send_packet(&pkbuffer2, spcb->sockfd, from) <0){
+					if(send_packet(spcb->lossprob,&pkbuffer2, spcb->sockfd, from) <0){
 						return -1;
 					}
 				spcb->last_seq_num_sent = spcb->last_seq_num_sent +1;
@@ -296,7 +296,7 @@ int rtlp_transfer_loop(struct rtlp_server_pcb *spcb)
 				else if(pkbuffer.hdr.type == RTLP_TYPE_FIN) {
 					create_pkbuf(&pkbuffer, RTLP_TYPE_ACK,spcb->last_seq_num_received+1,0, NULL,0);
 					printf("The server wants to close the connection\n");
-					if(send_packet(&pkbuffer, spcb->sockfd, from) <0){
+					if(send_packet(spcb->lossprob,&pkbuffer, spcb->sockfd, from) <0){
 						return -1;
 					}
 					spcb->state = RTLP_STATE_FIN_WAIT;
@@ -365,7 +365,7 @@ int rtlp_transfer_loop(struct rtlp_server_pcb *spcb)
 			//Send the packets in the buffer
 			for(j=0;j<spcb->window_size;j++){
 				if(spcb->send_buf[j].hdr.seqnbr != -1){
-					send_packet(&spcb->send_buf[j], spcb->sockfd, from);
+					send_packet(spcb->lossprob,&spcb->send_buf[j], spcb->sockfd, from);
 				}
 			}
 
@@ -405,7 +405,7 @@ int rtlp_transfer_loop(struct rtlp_server_pcb *spcb)
 					else if(pkbuffer.hdr.type == RTLP_TYPE_FIN)  {
 						create_pkbuf(&pkbuffer, RTLP_TYPE_ACK,spcb->last_seq_num_received+1,0, NULL,0);
 						printf("*****   The server wants to close the connection   ******\n");
-						if(send_packet(&pkbuffer, spcb->sockfd, from) <0){
+						if(send_packet(spcb->lossprob,&pkbuffer, spcb->sockfd, from) <0){
 							return -1;
 						}
 						spcb->state = RTLP_STATE_FIN_WAIT;
@@ -430,7 +430,7 @@ int rtlp_transfer_loop(struct rtlp_server_pcb *spcb)
 					else if(pkbuffer.hdr.type == RTLP_TYPE_DATA) {
 						//Acknowledge a DATA packet received out of sequence
 						create_pkbuf(&pkbuffer, RTLP_TYPE_ACK,pkbuffer.hdr.seqnbr+1,0, NULL,0);
-						if(send_packet(&pkbuffer, spcb->sockfd, from) <0){
+						if(send_packet(spcb->lossprob,&pkbuffer, spcb->sockfd, from) <0){
 							return -1;
 						}
 					}
@@ -479,7 +479,7 @@ int rtlp_transfer_loop(struct rtlp_server_pcb *spcb)
 						else if(pkbuffer.hdr.type == RTLP_TYPE_FIN)  {
 							create_pkbuf(&pkbuffer, RTLP_TYPE_ACK,spcb->last_seq_num_received+1,0, NULL,0);
 							printf("The server wants to close the connection\n");
-							if(send_packet(&pkbuffer, spcb->sockfd, from) <0){
+							if(send_packet(spcb->lossprob,&pkbuffer, spcb->sockfd, from) <0){
 								return -1;
 							}
 							spcb->state = RTLP_STATE_FIN_WAIT;
@@ -581,7 +581,7 @@ int rtlp_transfer_loop(struct rtlp_server_pcb *spcb)
 						}
 						printf("check_full ACK= %d\n",check_full);
 						create_pkbuf(&pkbuffer, RTLP_TYPE_ACK,first_seq_number+check_full+1,0, NULL,0);
-						if(send_packet(&pkbuffer, spcb->sockfd, from) <0){
+						if(send_packet(spcb->lossprob,&pkbuffer, spcb->sockfd, from) <0){
 							return -1;
 						}
 
@@ -616,7 +616,7 @@ int rtlp_transfer_loop(struct rtlp_server_pcb *spcb)
 					else if(pkbuffer.hdr.type == RTLP_TYPE_FIN)  {
 							create_pkbuf(&pkbuffer, RTLP_TYPE_ACK,spcb->last_seq_num_received+1,0, NULL,0);
 							printf("The server wants to close the connection\n");
-							if(send_packet(&pkbuffer, spcb->sockfd, from) <0){
+							if(send_packet(spcb->lossprob,&pkbuffer, spcb->sockfd, from) <0){
 								return -1;
 							}
 							spcb->state = RTLP_STATE_FIN_WAIT;
@@ -673,7 +673,7 @@ int rtlp_server_reset(struct rtlp_server_pcb *spcb, struct sockaddr_in *from){
 
 	printf("Reset packet created\n");
 
-	if(send_packet(&pkbuffer, spcb->sockfd, *from) <0){
+	if(send_packet(spcb->lossprob,&pkbuffer, spcb->sockfd, *from) <0){
 		return -1;
 	}
 	spcb->state = RTLP_STATE_CLOSED;

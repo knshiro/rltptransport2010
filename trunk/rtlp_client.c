@@ -63,7 +63,7 @@ int rtlp_connect(struct rtlp_client_pcb *cpcb, char *dst_addr, int dst_port){
     fromlen = sizeof(cpcb->serv_addr);
     i=0;
     while(i<3) {
-        if(send_packet(&pkbuffer, cpcb->sockfd, cpcb->serv_addr) <0){
+        if(send_packet(cpcb->lossprob,&pkbuffer, cpcb->sockfd, cpcb->serv_addr) <0){
             exit(-1);
         }
         cpcb->state = RTLP_STATE_SYN_SENT;
@@ -132,7 +132,7 @@ int rtlp_client_reset(struct rtlp_client_pcb *cpcb){
 
     printf("Packet created\n");
 
-    if(send_packet(&pkbuffer, cpcb->sockfd, cpcb->serv_addr) <0){
+    if(send_packet(cpcb->lossprob,&pkbuffer, cpcb->sockfd, cpcb->serv_addr) <0){
         return -1;
     }
     cpcb->state = RTLP_STATE_CLOSED;
@@ -243,7 +243,7 @@ int rtlp_transfer(struct rtlp_client_pcb *cpcb, void *data, int len,
             printf("TIME : %d\n",current_time);
             if(current_time - cpcb->time_send[i] > 2){
                 printf(">>>>>>>>>Timeout packet number : %d\n",cpcb->send_buf[i].hdr.seqnbr);
-                send_packet(&cpcb->send_buf[i],cpcb->sockfd,cpcb->serv_addr);
+                send_packet(cpcb->lossprob,&cpcb->send_buf[i],cpcb->sockfd,cpcb->serv_addr);
                 cpcb->time_send[i] = current_time;
             }
         }
@@ -316,7 +316,7 @@ int rtlp_close(struct rtlp_client_pcb *cpcb)
         while(i<3) {
             
             printf("Loop for fin packet\n");
-            if(send_packet(pkbuffer, sockfd, cpcb->serv_addr) <0){
+            if(send_packet(cpcb->lossprob,pkbuffer, sockfd, cpcb->serv_addr) <0){
                 exit(-1);
             }
 
@@ -333,6 +333,7 @@ int rtlp_close(struct rtlp_client_pcb *cpcb)
             srv = select(sockfd+1, &readfds, NULL, NULL, &tv);
             if (srv == -1) {
                 perror("select"); // error occurred in select()
+                return -1;
             } else if (srv == 0) {
                 printf("Timeout occurred! No data after 2 seconds.\n");
                 i++;
@@ -496,7 +497,7 @@ int treat_rtlp_buf(struct rtlp_client_pcb *cpcb, FILE *output, int sendAck){
         // ACK last ack number
         printf("Send ack number %d",cpcb->last_seq_num_sent);
         create_pkbuf(&pkbuffer,RTLP_TYPE_ACK,cpcb->last_seq_num_sent,0,NULL,0);
-        send_packet(&pkbuffer,cpcb->sockfd,cpcb->serv_addr);
+        send_packet(cpcb->lossprob,&pkbuffer,cpcb->sockfd,cpcb->serv_addr);
         for(i=0;i<cpcb->window_size;i++){
             if(cpcb->send_buf[i].hdr.seqnbr < cpcb->last_seq_num_sent){
                 cpcb->send_buf[i].hdr.seqnbr = 1;
@@ -519,7 +520,7 @@ int fill_pck_buf(struct rtlp_client_pcb *cpcb,struct pkbuf * pkbuffer){
             cpcb->last_seq_num_sent++; 
             cpcb->time_send[i] = time(0);
             memcpy(&cpcb->send_buf[i],pkbuffer,sizeof(struct pkbuf));
-            send_packet(&cpcb->send_buf[i],cpcb->sockfd,cpcb->serv_addr);
+            send_packet(cpcb->lossprob,&cpcb->send_buf[i],cpcb->sockfd,cpcb->serv_addr);
             done = 1; 
         }
         i++;
