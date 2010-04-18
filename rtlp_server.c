@@ -12,6 +12,7 @@
 #include "RTLP_util.h"
 #include "rtlp.h"
 #include <dirent.h>
+#include <sys/wait.h>
 
 void print_state_spcb(struct rtlp_server_pcb *spcb);
 void write_to_output(struct pkbuf* buffer, FILE *output, struct rtlp_server_pcb *spcb);
@@ -51,13 +52,17 @@ int rtlp_accept(struct rtlp_server_pcb *spcb){
 	fd_set readfds;
 	pid_t pid;
 	fromlen = sizeof(from);
-
+	int status;
 	int sockfd;
 
 	while(1) {
+				
 		FD_ZERO(&readfds);
 		FD_SET(spcb->sockfd, &readfds);
 
+		if(pid!=0) {
+			waitpid(-1,&status,WNOHANG);
+		}
 
 		int srv = select(spcb->sockfd+1, &readfds, NULL, NULL, 0);
 		if (srv == -1) {
