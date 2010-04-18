@@ -128,6 +128,7 @@ int rtlp_transfer_loop(struct rtlp_server_pcb *spcb)
 	long longlen;
 	int jump_select=0;
 	struct pkbuf pkbuffer;
+	struct pkbuf pkbuffer2;
 	char payloadbuff[RTLP_MAX_PAYLOAD_SIZE];
 	char udp_buffer[RTLP_MAX_PAYLOAD_SIZE+12];
 	char filename[50];
@@ -138,7 +139,7 @@ int rtlp_transfer_loop(struct rtlp_server_pcb *spcb)
 	fromlen = sizeof(from);
 
 	int len_packet;
-	int send=0; 
+	int send=4; 
 	FILE * f;
 
 	char list_to_send[RTLP_MAX_PAYLOAD_SIZE];
@@ -153,7 +154,7 @@ int rtlp_transfer_loop(struct rtlp_server_pcb *spcb)
 
 	while(1) {
 		begin:
-		printf("Entry of the main loop: Wait for the client to ask for something\n");
+		printf("###  Entry of the main loop: Wait for the client to ask for something  ####\n");
 		//First, we check if the client asked for something and at the end if it sends a FIN packet.
 		/* clear the set ahead of time */
 		FD_ZERO(&readfds);
@@ -174,19 +175,22 @@ int rtlp_transfer_loop(struct rtlp_server_pcb *spcb)
 				if((len_packet=recvfrom(spcb->sockfd,udp_buffer, sizeof(udp_buffer), 0, (struct sockaddr*)&from, &fromlen)) < 0) {
 					perror("Couldn't receive from socket");
 				}
-
+				udp_to_pkbuf(&pkbuffer, udp_buffer,len_packet);
 				printf("Packet of type %d received\n", pkbuffer.hdr.type);
+				
 				print_state_spcb(spcb);
-				//Send an ACK
-				create_pkbuf(&pkbuffer, RTLP_TYPE_ACK,spcb->last_seq_num_sent+1,0, NULL,0);
-				if(send_packet(&pkbuffer, spcb->sockfd, from) <0){
-					return -1;
-				}
-				printf("ACK of the query sent\n");
+				//Send an ACK IF it is not already an ACK
+				if(pkbuffer.hdr.type!=RTLP_TYPE_ACK) {
+					create_pkbuf(&pkbuffer2, RTLP_TYPE_ACK,spcb->last_seq_num_sent+1,0, NULL,0);
+					if(send_packet(&pkbuffer2, spcb->sockfd, from) <0){
+						return -1;
+					}
 				spcb->last_seq_num_sent = spcb->last_seq_num_sent +1;
+				printf("ACK of the query sent\n");
+				}
 				printf("spcb->last_seq_num_sent: %d\n",spcb->last_seq_num_sent);
 				//spcb->last_seq_num_sent = pkbuffer.hdr.seqnbr + 1;
-				udp_to_pkbuf(&pkbuffer, udp_buffer,len_packet);
+				
 				
 				if (pkbuffer.hdr.type == RTLP_TYPE_DATA) {              
 					//Read the data to know what the client asked for
@@ -282,6 +286,7 @@ int rtlp_transfer_loop(struct rtlp_server_pcb *spcb)
 				}
 				else if(pkbuffer.hdr.type == RTLP_TYPE_ACK) {
 				//Do nothing
+				printf("******  ACK received out of sequence   *****\n");
 				}
 				else {
 					rtlp_server_reset(spcb,&from);
@@ -304,7 +309,6 @@ int rtlp_transfer_loop(struct rtlp_server_pcb *spcb)
 		//Process to send the WHOLE file and handle the acks.
 		while( check_ack!=msg_size && send<2 ){
 			j=0;  
-			printf("check\n");
 			//Fill the packet buffer
 			while(i<msg_size && j<spcb->window_size){   
 				if(spcb->send_buf[j].hdr.seqnbr == -1){  //Check if the buffer has free space
@@ -375,7 +379,7 @@ int rtlp_transfer_loop(struct rtlp_server_pcb *spcb)
 					}
 					else if(pkbuffer.hdr.type == RTLP_TYPE_FIN)  {
 						create_pkbuf(&pkbuffer, RTLP_TYPE_ACK,spcb->last_seq_num_received+1,0, NULL,0);
-						printf("The server wants to close the connection\n");
+						printf("*****   The server wants to close the connection   ******\n");
 						if(send_packet(&pkbuffer, spcb->sockfd, from) <0){
 							return -1;
 						}
@@ -495,15 +499,16 @@ int rtlp_transfer_loop(struct rtlp_server_pcb *spcb)
 			
 			//printf("check_ack: %d,first_seq_number: %d ,max_ack_received:%d   ,  msg_size: %d\n",check_ack,first_seq_number,spcb->max_ack_received,msg_size);
 		}  
-		if (send==1)
-			printf("The file '%s' has been sent successfully\n",filename);
-
+		if (send<2) {
+			send=4;
+			printf("The file/list has been sent successfully\n");
+		}
 
 
 
 		//The client sends a file to the server
-		while(send==2){
-		}
+		//while(send==2){
+		//}
 	}	
 	return 0;       
 }
@@ -532,7 +537,7 @@ int rtlp_server_reset(struct rtlp_server_pcb *spcb, struct sockaddr_in *from){
 void print_state_spcb(struct rtlp_server_pcb *spcb){
     int i;
 
-    printf("=================CPCB state===================\n");
+    printf("=================SPCB state===================\n");
 
     printf("Window size : %d\n",spcb->window_size);
 
@@ -549,7 +554,7 @@ void print_state_spcb(struct rtlp_server_pcb *spcb){
 
     printf("\n");
 
-    printf("=================CPCB state===================\n");
+    printf("=================SPCB state===================\n");
 }
 
 
