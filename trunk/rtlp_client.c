@@ -148,7 +148,7 @@ int rtlp_transfer(struct rtlp_client_pcb *cpcb, void *data, int len,
     printf(">>>>Transfert\n");
 
 
-    int i,msg_size = 1,sendAck = 0;
+    int i,msg_size = 1,sendAck = 0,returnValue = 0;
     struct pkbuf pkbuffer;
     FILE *output = NULL;
     struct timeval tv;
@@ -206,7 +206,7 @@ int rtlp_transfer(struct rtlp_client_pcb *cpcb, void *data, int len,
     
         create_pkbuf(&pkbuffer, RTLP_TYPE_DATA,(cpcb->last_seq_num_sent+1),msg_size,data,len); 
         
-        if(fill_pck_buf(cpcb,&pkbuffer)<1){       
+        if( (returnValue = fill_pck_buf(cpcb,&pkbuffer))<1){       
             //If there was not free slot in the packet buffer wait for some ack and try again
             printf(">>No space in the buffer, try to wait...\n");
             // clear the set ahead of time 
@@ -228,7 +228,7 @@ int rtlp_transfer(struct rtlp_client_pcb *cpcb, void *data, int len,
             sendAck = 0;
 
             //Fill the packet buffer
-            fill_pck_buf(cpcb,&pkbuffer);
+            returnValue = fill_pck_buf(cpcb,&pkbuffer);
         }
     }
     for(i=0;i<cpcb->window_size;i++){
@@ -246,8 +246,8 @@ int rtlp_transfer(struct rtlp_client_pcb *cpcb, void *data, int len,
     if(output != NULL){
         fclose(output);
     }
-    printf("<<<<<Transfert\n");
-    return 0;
+    printf("<<<<<<< Transfert with return value = %d\n",returnValue);
+    return returnValue;
 }
 
 
