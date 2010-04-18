@@ -276,6 +276,7 @@ int rtlp_transfer_loop(struct rtlp_server_pcb *spcb)
 						//Indicate the first seq nbr of the file to receive
 						first_seq_number = pkbuffer.hdr.seqnbr+1;
 						send=2;
+						msg_size=1;
 					}
 				}
 				//The server receives a FIN packet
@@ -518,11 +519,13 @@ int rtlp_transfer_loop(struct rtlp_server_pcb *spcb)
 
 		//The client sends a file to the server
 		while(file_size<msg_size && send==2){
+			printf("Ca marche\n");
 			//Create the file
 			output = fopen( "output", "a");
 			//We receive something
 			tv.tv_sec=1;
 			while(select(spcb->sockfd+1, &readfds, NULL, NULL, &tv)>0 && file_size<msg_size) {
+				
 				if (FD_ISSET(spcb->sockfd, &readfds)) {
 
 					bzero(udp_buffer, sizeof(udp_buffer));
@@ -533,8 +536,10 @@ int rtlp_transfer_loop(struct rtlp_server_pcb *spcb)
 					printf("Packet of type %d received\n", pkbuffer.hdr.type);
 
 					if ( pkbuffer.hdr.type == RTLP_TYPE_DATA ) {  // If the received message is an ACK
+						//Store msg_size
+						msg_size=pkbuffer.hdr.total_msg_size;
+
 						//put the payload at the good place
-						
 						i = pkbuffer.hdr.seqnbr - first_seq_number;
 						memcpy(&spcb->receive_buf[i],&pkbuffer,sizeof(struct pkbuf)); 
 						spcb->receive_buf_full[i]=1;
@@ -589,6 +594,7 @@ int rtlp_transfer_loop(struct rtlp_server_pcb *spcb)
 		if (send==2) {
 			send=4;
 			printf("The file has been received successfully\n");
+			fclose(output);
 		}
 	}	
 	return 0;       
