@@ -515,7 +515,11 @@ int rtlp_transfer_loop(struct rtlp_server_pcb *spcb)
 			printf("The file/list has been sent successfully\n");
 		}
 
-
+		if(send==2) {
+			for(k=0;k<spcb->window_size;k++) {
+				spcb->receive_buf_full[k]=0;
+			}
+		}
 
 		//The client sends a file to the server
 		while(file_size<msg_size && send==2){
@@ -532,7 +536,6 @@ int rtlp_transfer_loop(struct rtlp_server_pcb *spcb)
 
 
 			while(select(spcb->sockfd+1, &readfds, NULL, NULL, &tv)>0 && file_size<msg_size) {
-				printf("Received a packet\n");
 				if (FD_ISSET(spcb->sockfd, &readfds)) {
 
 					bzero(udp_buffer, sizeof(udp_buffer));
@@ -540,26 +543,29 @@ int rtlp_transfer_loop(struct rtlp_server_pcb *spcb)
 						perror("Couldn't receive from socket");
 					}
 					udp_to_pkbuf(&pkbuffer, udp_buffer,len_packet);
-					printf("Packet of type %d received\n", pkbuffer.hdr.type);
+					printf("Packet of type %d received || Sequence Number: %d\n", pkbuffer.hdr.type,pkbuffer.hdr.seqnbr);
 
 					if ( pkbuffer.hdr.type == RTLP_TYPE_DATA ) {  // If the received message is an ACK
 						//Store msg_size
 						msg_size = pkbuffer.hdr.total_msg_size;
-
+						printf("spcb->receive_buf_full[1]:%d\n",spcb->receive_buf_full[1]);
 						//put the payload at the good place
 						i = pkbuffer.hdr.seqnbr - first_seq_number;
+						printf("pkbuffer.hdr.seqnbr %d , first_seq_number = %d\n",pkbuffer.hdr.seqnbr,first_seq_number);
 						memcpy(&spcb->receive_buf[i],&pkbuffer,sizeof(struct pkbuf)); 
-						spcb->receive_buf_full[i]=1;
+						spcb->receive_buf_full[0]=1;
 						file_size++;
-
+						printf("Received %d packets of %d\n",file_size,msg_size);
 						//Check which ACK to send
 						check_full=-1;
 						for(k=0;k<spcb->window_size;k++) {
+							printf("spcb->receive_buf_full[%d]:%d\n",k,spcb->receive_buf_full[k]);
 							if(spcb->receive_buf_full[k]!=1){
 								break;
 							}
 						check_full=k;
 						}
+						printf("check_full ACK= %d\n",check_full);
 						create_pkbuf(&pkbuffer, RTLP_TYPE_ACK,first_seq_number+check_full+1,0, NULL,0);
 						if(send_packet(&pkbuffer, spcb->sockfd, from) <0){
 							return -1;
@@ -575,17 +581,20 @@ int rtlp_transfer_loop(struct rtlp_server_pcb *spcb)
 						k++;
 						check_full++;
 						}
-
+						printf("check_full Write= %d\n",check_full);
 						//we can write to file from 0 to i
 						for(u=0;u<=check_full;u++) {
 							write_to_output(&(spcb->receive_buf[u]),output, spcb);
 							spcb->receive_buf_full[u]=0;	
-							first_seq_number = spcb->last_seq_num_received+u; 
 						}
+						first_seq_number = first_seq_number + check_full+1;
+						
 						//decaler
 						int soust = spcb->window_size-check_full-1;	
 						for(u=0;u<soust;u++){
 							spcb->receive_buf[u] = spcb->receive_buf[check_full+u+1]; 
+							spcb->receive_buf_full[u] = spcb->receive_buf_full[check_full+u+1];
+							spcb->receive_buf_full[check_full+u+1]=0;
 						}
 						
 					}
