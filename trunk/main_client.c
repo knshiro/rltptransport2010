@@ -52,7 +52,7 @@ int main(int argc, char **argv)
                 strcat(entry,outfile);
                 printf("Cmd : %s Outfile : %s, Entry: %s\n", cmd, outfile,entry);
                 rtlp_transfer(&cpcb,entry,strlen(entry),"output");
-                while(cpcb.total_msg_size > cpcb.size_received || 1){
+                while(cpcb.total_msg_size != cpcb.size_received ){
                     scanf("%s",cmd);
                     if(strcmp(cmd,"r")==0){
                         rtlp_transfer(&cpcb,NULL,0,"output");	
@@ -72,6 +72,7 @@ int main(int argc, char **argv)
             else if(strcmp(cmd,"PUT")==0){
                 int i,msg_size,longlen,length_last_packet,current_length;
                 FILE * f;
+                char data[RTLP_MAX_PAYLOAD_SIZE];
 
                 //Write command 
                 scanf("%s",outfile);			
@@ -106,8 +107,13 @@ int main(int argc, char **argv)
                     else {
                         current_length = length_last_packet;
                     }
-
                     scanf("%s",cmd);
+                    
+                    if(strcmp(cmd,"n")==0){
+                        //if(
+                        rtlp_transfer(&cpcb,NULL,0,NULL);	
+                    }
+                    
                     if(strcmp(cmd,"r")==0){
                         rtlp_transfer(&cpcb,NULL,0,NULL);	
                     }
