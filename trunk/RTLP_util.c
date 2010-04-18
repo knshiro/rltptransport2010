@@ -55,7 +55,7 @@ int send_packet(struct pkbuf* packet, int sockfd, struct sockaddr_in serv_addr){
   printf("Packet Buff seqnbr: %d\n",packet->hdr.seqnbr);
   printf("Packet Buff total_msg_size: %d\n",packet->hdr.total_msg_size);
   printf("packet buff len : %d\n",packet->len);
-  printf("packet buff payload : %s\n",packet->payload);
+  //printf("packet buff payload : %s\n",packet->payload);
   if(packet->len > RTLP_MAX_PAYLOAD_SIZE){
     return -1;            //TODO stderr
   }
