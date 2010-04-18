@@ -139,42 +139,42 @@ int rtlp_test(struct rtlp_client_pcb *cpcb){
 
     int sockfd,i,srv,numRead;
     sockfd=cpcb->sockfd;
-struct pkbuf *pkbuffer;
-pkbuffer = (struct pkbuf*)malloc(sizeof(struct pkbuf));
+    struct pkbuf *pkbuffer;
+    pkbuffer = (struct pkbuf*)malloc(sizeof(struct pkbuf));
 
-char rtlp_packet[RTLP_MAX_PAYLOAD_SIZE+12];
-fd_set readfds;
+    char rtlp_packet[RTLP_MAX_PAYLOAD_SIZE+12];
+    fd_set readfds;
 
-while(1) {
+    while(1) {
 
-srv = select(sockfd+1, &readfds, NULL, NULL, 0);
-if (srv == -1) {
-	perror("select"); // error occurred in select()
-} else if (srv == 0) {
-	printf("Timeout occurred! No data after 2 seconds.\n");
-        i++;
-} else {
-	// one or both of the descriptors have data
-	if (FD_ISSET(sockfd, &readfds)) {
-		bzero(rtlp_packet, sizeof(rtlp_packet));
-        	if(numRead = recv(sockfd,rtlp_packet,sizeof(rtlp_packet),0) < 0)
-		{
-		      perror("Couldnt' receive from socket");
-		}
+        srv = select(sockfd+1, &readfds, NULL, NULL, 0);
+        if (srv == -1) {
+            perror("select"); // error occurred in select()
+        } else if (srv == 0) {
+            printf("Timeout occurred! No data after 2 seconds.\n");
+            i++;
+        } else {
+            // one or both of the descriptors have data
+            if (FD_ISSET(sockfd, &readfds)) {
+                bzero(rtlp_packet, sizeof(rtlp_packet));
+                if(numRead = recv(sockfd,rtlp_packet,sizeof(rtlp_packet),0) < 0)
+                {
+                    perror("Couldnt' receive from socket");
+                }
 
-        	udp_to_pkbuf(pkbuffer, rtlp_packet, numRead);
-        	printf("PPPPacket of type %d received\n", pkbuffer->hdr.type );
-        	if ( pkbuffer->hdr.type == RTLP_TYPE_DATA ) {
-          		printf("Received Data\n");
-         		printf("pkbuffer.payload: %s\n",pkbuffer->payload);	
-          		return 0;
-        	} else {
-          		rtlp_client_reset(cpcb);
-          		printf("Server misbehaviour\n");
-         		return -1;
-        	}
-	}
-}
-}
+                udp_to_pkbuf(pkbuffer, rtlp_packet, numRead);
+                printf("PPPPacket of type %d received\n", pkbuffer->hdr.type );
+                if ( pkbuffer->hdr.type == RTLP_TYPE_DATA ) {
+                    printf("Received Data\n");
+                    printf("pkbuffer.payload: %s\n",pkbuffer->payload);	
+                    return 0;
+                } else {
+                    rtlp_client_reset(cpcb);
+                    printf("Server misbehaviour\n");
+                    return -1;
+                }
+            }
+        }
+    }
 
 }
