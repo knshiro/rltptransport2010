@@ -228,7 +228,7 @@ int rtlp_accept(struct rtlp_server_pcb *spcb);
  * 0 on success, -1 on failure
  */
 
-int rtlp_server_reset(struct rtlp_server_pcb *spcb);
+int rtlp_server_reset(struct rtlp_server_pcb *spcb,struct sockaddr_in *from);
 /*
  * Functionality:
  * Independent of the state of the connection (except of the CLOSED state), 
