@@ -16,6 +16,7 @@ int rtlp_connect(struct rtlp_client_pcb *cpcb, char *dst_addr, int dst_port){
     printf(">>> Function rtlp_connect\n");
 
     int sockfd,i,srv,numRead;
+    socklen_t fromlen;
     struct pkbuf pkbuffer;
     //pkbuffer = (struct pkbuf*)malloc(sizeof(struct pkbuf));
     struct timeval tv;
@@ -59,6 +60,7 @@ int rtlp_connect(struct rtlp_client_pcb *cpcb, char *dst_addr, int dst_port){
 
     create_pkbuf(&pkbuffer, RTLP_TYPE_SYN, 0,0, NULL,0);
 
+    fromlen = sizeof(cpcb->serv_addr);
     i=0;
     while(i<3) {
         if(send_packet(&pkbuffer, cpcb->sockfd, cpcb->serv_addr) <0){
@@ -85,7 +87,7 @@ int rtlp_connect(struct rtlp_client_pcb *cpcb, char *dst_addr, int dst_port){
             // one or both of the descriptors have data
             if (FD_ISSET(sockfd, &readfds)) {
                 bzero(rtlp_packet, sizeof(rtlp_packet));
-                if((numRead = recv(sockfd,rtlp_packet,sizeof(rtlp_packet),0)) < 0)
+                if((numRead = recvfrom(sockfd,rtlp_packet,sizeof(rtlp_packet),0,(struct sockaddr*) &(cpcb->serv_addr), &fromlen)) < 0)
                 {
                     perror("Couldnt' receive from socket");
                 }

@@ -211,3 +211,38 @@ error_close:
 error:
 	return NULL;
 }
+
+/*
+void debug(int debugMode,const char * msg, ...){
+    char * fch,lch;
+    int nb_args = 0,i;
+    va_list ap;
+    char types[10],buffer[50];
+
+    pch=strchr(msg,'%');
+    while (fch!=NULL)
+    {
+        types[nb_args] = *(fch+1);
+        nb_args++;
+        fch=strchr(fch+1,'%');
+    }
+
+    va_start(ap, nb_args); 
+    for(i=0;i<nb_args;i++){
+        pch=strchr(msg,'%');
+        strncpy(buffer,msg, pch-msg+1);
+        switch(*pch){
+            case i:
+            case d:
+                printf(buffer,va_arg(ap, int));
+                break;
+            case s:
+                 printf(buffer,va_arg(s,char *));
+            default:
+               ; 
+        }
+    }
+    strncpy(buffer,msg, pch-msg+1);
+
+}
+*/
